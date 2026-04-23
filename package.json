@@ -1,0 +1,13 @@
+{
+  "name": "kairos-agent-sdk-typescript",
+  "private": true,
+  "packageManager": "bun",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun run --workspaces build",
+    "typecheck": "bun run --workspaces typecheck",
+    "clean": "bun run --workspaces clean"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@kairos/web-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@kairos/web-ui build placeholder\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "echo \"@kairos/web-ui clean placeholder\""
+  }
+}

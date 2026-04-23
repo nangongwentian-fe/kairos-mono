@@ -1,0 +1,18 @@
+{
+  "name": "@kairos/coding-agent",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@kairos/coding-agent build placeholder\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "echo \"@kairos/coding-agent clean placeholder\""
+  },
+  "dependencies": {
+    "@kairos/ai": "workspace:*",
+    "@kairos/agent": "workspace:*",
+    "@kairos/tui": "workspace:*"
+  }
+}
