@@ -8,6 +8,10 @@
   "scripts": {
     "build": "echo \"@kairos/ai build placeholder\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
     "clean": "echo \"@kairos/ai clean placeholder\""
+  },
+  "dependencies": {
+    "openai": "^6.34.0"
   }
 }
