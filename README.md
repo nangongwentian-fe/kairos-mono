@@ -1,6 +1,6 @@
-# Kairos Agent SDK TypeScript
+# Kairos Mono
 
-Kairos agent SDK TypeScript monorepo skeleton.
+Kairos TypeScript monorepo for AI model access, agent runtime, coding-agent products, and user interfaces.
 
 ## Packages
 

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "kairos-agent-sdk-typescript",
+      "name": "kairos-mono",
       "devDependencies": {
         "@types/bun": "^1.3.13",
         "typescript": "^6.0.3",

@@ -1,5 +1,5 @@
 {
-  "name": "kairos-agent-sdk-typescript",
+  "name": "kairos-mono",
   "private": true,
   "packageManager": "bun",
   "workspaces": [
