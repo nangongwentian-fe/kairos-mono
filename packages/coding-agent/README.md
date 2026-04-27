@@ -23,9 +23,44 @@ console.log(run.result.messages);
 console.log(run.trace.items);
 ```
 
+Write an explicit run record:
+
+```ts
+import { requireModel } from "@kairos/ai";
+import {
+  createCodingRunRecord,
+  runCodingTask,
+  writeCodingRunRecord,
+} from "@kairos/coding-agent";
+
+const model = requireModel("opencode-go", "kimi-k2.6");
+const input = "Read README.md and summarize it.";
+
+const run = await runCodingTask({
+  root: process.cwd(),
+  model,
+  input,
+});
+
+await writeCodingRunRecord(
+  createCodingRunRecord({
+    root: process.cwd(),
+    model,
+    input,
+    trace: run.trace,
+    result: run.result,
+  }),
+  ".kairos/runs/last.json",
+);
+```
+
+Run records may include file contents, command output, and tool arguments. Use
+explicit paths and avoid committing generated records.
+
 Current behavior:
 
 - `runCodingTask` creates a coding agent, records an in-memory trace, runs one task, optionally emits live events through `onEvent`, and returns `{ result, trace }`.
+- `createCodingRunRecord` and `writeCodingRunRecord` persist one explicit JSON run record when the caller asks for it.
 - `list_dir` lists directory entries as JSON with `name`, `path`, and `type`.
 - `grep` searches file contents with ripgrep and returns JSON matches with `file`, `line`, `text`, and `isMatch`.
 - `read_file` reads UTF-8 text files.
@@ -60,6 +95,7 @@ The workflow integration test uses `OPENCODE_API_KEY` from `.env.local` and asks
 src
 ├── index.ts        # public exports
 ├── agent.ts        # createCodingAgent factory
+├── run-record.ts   # explicit JSON run records
 ├── task.ts         # runCodingTask helper
 ├── types.ts        # public coding-agent types
 └── tools

@@ -19,6 +19,7 @@ describe("@kairos/tui CLI args", () => {
       modelId: "kimi-k2.6",
       outputMode: "tui",
       readStdin: false,
+      recordPath: undefined,
       root: "/repo",
       help: false,
     });
@@ -35,6 +36,7 @@ describe("@kairos/tui CLI args", () => {
       modelId: "glm-5.1",
       outputMode: "tui",
       readStdin: false,
+      recordPath: undefined,
       root: "/repo/packages/ai",
       help: false,
     });
@@ -51,12 +53,13 @@ describe("@kairos/tui CLI args", () => {
       modelId: "qwen3.6-plus",
       outputMode: "tui",
       readStdin: false,
+      recordPath: undefined,
       root: "/tmp/project",
       help: false,
     });
   });
 
-  test("parses print, json, and stdin modes", () => {
+  test("parses print, json, stdin, and record options", () => {
     expect(parseTuiCliArgs(["--print", "-"], { cwd: "/repo" })).toMatchObject({
       outputMode: "print",
       readStdin: true,
@@ -65,6 +68,21 @@ describe("@kairos/tui CLI args", () => {
       input: "Inspect",
       outputMode: "json",
       readStdin: false,
+    });
+    expect(
+      parseTuiCliArgs(["--record", ".kairos/runs/last.json", "Inspect"], {
+        cwd: "/repo",
+      }),
+    ).toMatchObject({
+      input: "Inspect",
+      recordPath: "/repo/.kairos/runs/last.json",
+    });
+    expect(
+      parseTuiCliArgs(["--record=/tmp/run.json", "Inspect"], {
+        cwd: "/repo",
+      }),
+    ).toMatchObject({
+      recordPath: "/tmp/run.json",
     });
   });
 
@@ -78,6 +96,9 @@ describe("@kairos/tui CLI args", () => {
     expect(() => parseTuiCliArgs(["--root="], { cwd: "/repo" })).toThrow(
       "Missing value for --root",
     );
+    expect(() => parseTuiCliArgs(["--record"], { cwd: "/repo" })).toThrow(
+      "Missing value for --record",
+    );
     expect(() => parseTuiCliArgs(["--print", "--json"], { cwd: "/repo" })).toThrow(
       "--print and --json cannot be used together",
     );
@@ -90,6 +111,7 @@ describe("@kairos/tui CLI args", () => {
     expect(createTuiCliHelp()).toContain("echo \"task\"");
     expect(createTuiCliHelp()).toContain("--print");
     expect(createTuiCliHelp()).toContain("--json");
+    expect(createTuiCliHelp()).toContain("--record");
   });
 
   test("combines piped stdin with optional prompt text", async () => {

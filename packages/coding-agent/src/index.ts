@@ -4,6 +4,12 @@ export {
   DEFAULT_CODING_AGENT_SYSTEM_PROMPT,
   createCodingAgent,
 } from "./agent.js";
+export {
+  CODING_RUN_RECORD_VERSION,
+  createCodingRunRecord,
+  formatCodingRunRecordModel,
+  writeCodingRunRecord,
+} from "./run-record.js";
 export { runCodingTask } from "./task.js";
 export {
   createCodingAgentFileState,
@@ -37,3 +43,7 @@ export type {
   ReadFileToolArgs,
   ReadFileToolOptions,
 } from "./types.js";
+export type {
+  CodingRunRecord,
+  CreateCodingRunRecordOptions,
+} from "./run-record.js";

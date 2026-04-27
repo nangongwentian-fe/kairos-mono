@@ -26,6 +26,16 @@ Print agent events as JSON lines:
 bun run kairos --json "Read README.md and summarize it."
 ```
 
+Write one explicit run record:
+
+```bash
+bun run kairos --record .kairos/runs/last.json "Read README.md and summarize it."
+```
+
+Run records may include file contents, command output, and tool arguments. The
+repo ignores `.kairos/` by default so local records are not committed by
+accident.
+
 `--json` output is a public CLI protocol. It does not expose raw `AgentEvent`
 objects from `@kairos/agent`.
 
@@ -67,7 +77,7 @@ console.log(run.result.stopReason);
 Current scope:
 
 - `packages/tui/src/cli.ts` provides a minimal Bun CLI entry.
-- The CLI supports normal TUI output, `--print` final-text output, `--json` event output, and `-` for standard input.
+- The CLI supports normal TUI output, `--print` final-text output, `--json` event output, `--record` explicit run records, and `-` for standard input.
 - `--json` emits stable versioned JSONL events through `packages/tui/src/json-events.ts`.
 - `runTuiTask()` calls `runCodingTask()` and renders live events as plain terminal text.
 - Assistant text is streamed inline.

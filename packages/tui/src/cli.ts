@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
 import { requireModel } from "@kairos/ai";
-import { runCodingTask, type RunCodingTaskResult } from "@kairos/coding-agent";
+import {
+  createCodingRunRecord,
+  runCodingTask,
+  writeCodingRunRecord,
+  type RunCodingTaskResult,
+} from "@kairos/coding-agent";
 import { resolve } from "node:path";
 import {
   argv,
@@ -27,6 +32,7 @@ export interface TuiCliArgs {
   modelId: string;
   outputMode: TuiCliOutputMode;
   readStdin: boolean;
+  recordPath?: string;
   root: string;
   help: boolean;
 }
@@ -44,6 +50,7 @@ export function parseTuiCliArgs(
   let modelId = DEFAULT_MODEL_ID;
   let outputMode: TuiCliOutputMode = "tui";
   let readStdin = false;
+  let recordPath: string | undefined;
   let root = cwd;
   let help = false;
 
@@ -62,6 +69,17 @@ export function parseTuiCliArgs(
 
     if (arg === "--json") {
       outputMode = setOutputMode(outputMode, "json");
+      continue;
+    }
+
+    if (arg === "--record") {
+      recordPath = resolve(cwd, readFlagValue(args, index, "--record"));
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--record=")) {
+      recordPath = resolve(cwd, readInlineFlagValue(arg, "--record"));
       continue;
     }
 
@@ -104,6 +122,7 @@ export function parseTuiCliArgs(
     modelId,
     outputMode,
     readStdin,
+    recordPath,
     root,
     help,
   };
@@ -131,34 +150,47 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
 
   try {
     const model = requireModel(DEFAULT_PROVIDER, parsed.modelId);
+    let run: RunCodingTaskResult;
 
     if (parsed.outputMode === "tui") {
-      await runTuiTask({
+      run = await runTuiTask({
         root: parsed.root,
         model,
         input,
       });
-      return 0;
+    } else {
+      const jsonContext = createTuiJsonEventContext({
+        input,
+        root: parsed.root,
+        model,
+      });
+      run = await runCodingTask({
+        root: parsed.root,
+        model,
+        input,
+        onEvent:
+          parsed.outputMode === "json"
+            ? (event) => {
+                for (const jsonEvent of toTuiJsonEvents(event, jsonContext)) {
+                  stdout.write(formatTuiJsonEvent(jsonEvent));
+                }
+              }
+            : undefined,
+      });
     }
 
-    const jsonContext = createTuiJsonEventContext({
-      input,
-      root: parsed.root,
-      model,
-    });
-    const run = await runCodingTask({
-      root: parsed.root,
-      model,
-      input,
-      onEvent:
-        parsed.outputMode === "json"
-          ? (event) => {
-              for (const jsonEvent of toTuiJsonEvents(event, jsonContext)) {
-                stdout.write(formatTuiJsonEvent(jsonEvent));
-              }
-            }
-          : undefined,
-    });
+    if (parsed.recordPath) {
+      await writeCodingRunRecord(
+        createCodingRunRecord({
+          root: parsed.root,
+          model,
+          input,
+          trace: run.trace,
+          result: run.result,
+        }),
+        parsed.recordPath,
+      );
+    }
 
     if (parsed.outputMode === "print") {
       stdout.write(formatPrintOutput(run));
@@ -200,6 +232,7 @@ export function createTuiCliHelp(): string {
     "Options:",
     "  --print       Print only the final assistant text",
     "  --json        Print agent events as JSON lines",
+    "  --record <path>  Write the full run record to a JSON file",
     `  --model <id>  OpenCode Go model id. Default: ${DEFAULT_MODEL_ID}`,
     "  --root <path>  Workspace root. Default: current directory",
     "  -h, --help     Show this help message",
