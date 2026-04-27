@@ -9,5 +9,10 @@
     "build": "echo \"@kairos/tui build placeholder\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "echo \"@kairos/tui clean placeholder\""
+  },
+  "dependencies": {
+    "@kairos/ai": "workspace:*",
+    "@kairos/agent": "workspace:*",
+    "@kairos/coding-agent": "workspace:*"
   }
 }

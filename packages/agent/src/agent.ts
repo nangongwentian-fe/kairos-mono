@@ -8,6 +8,7 @@ import type {
   AgentState,
   AgentStreamFunction,
   AgentTool,
+  AgentToolConfirmation,
 } from "./types.js";
 
 export class Agent {
@@ -16,6 +17,7 @@ export class Agent {
   private readonly tools: readonly AgentTool<any>[];
   private readonly maxTurns: number;
   private readonly stream: AgentStreamFunction;
+  private readonly confirmToolCall?: AgentToolConfirmation;
   private readonly listeners = new Set<AgentEventListener>();
   private messages: Message[];
   private running = false;
@@ -30,6 +32,7 @@ export class Agent {
     this.tools = options.tools ?? [];
     this.maxTurns = options.maxTurns ?? 8;
     this.stream = options.stream ?? streamModel;
+    this.confirmToolCall = options.confirmToolCall;
     this.messages = [...(options.messages ?? [])];
   }
 
@@ -68,6 +71,7 @@ export class Agent {
         maxTurns: this.maxTurns,
         messages: this.messages,
         stream: this.stream,
+        confirmToolCall: this.confirmToolCall,
         emit: (event) => this.emit(event),
       });
     } finally {
@@ -81,4 +85,3 @@ export class Agent {
     }
   }
 }
-

@@ -5,7 +5,8 @@ import {
   expect,
   test,
 } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -88,6 +89,8 @@ describe("@kairos/coding-agent createCodingAgent", () => {
       "list_dir",
       "grep",
       "read_file",
+      "edit_file",
+      "run_command",
     ]);
   });
 
@@ -197,6 +200,406 @@ describe("@kairos/coding-agent createCodingAgent", () => {
         },
       ],
       truncated: false,
+    });
+  });
+
+  test("rejects the default edit_file tool without confirmation", async () => {
+    await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "edit_file",
+                arguments: {
+                  path: "README.md",
+                  oldText: "old",
+                  newText: "new",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("could not edit"),
+    ];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+    });
+
+    const result = await agent.run("Edit README.md");
+
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "Tool edit_file requires confirmation for write access.",
+      isError: true,
+    });
+    await expect(readFile(join(root, "README.md"), "utf8")).resolves.toBe(
+      "hello old world\n",
+    );
+  });
+
+  test("runs the default edit_file tool after confirmation", async () => {
+    await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "read_file",
+                arguments: {
+                  path: "README.md",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_2",
+                name: "edit_file",
+                arguments: {
+                  path: "README.md",
+                  oldText: "old",
+                  newText: "new",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("edited"),
+    ];
+    const previews: Array<string | undefined> = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+      confirmToolCall: (_toolCall, _tool, preview) => {
+        previews.push(preview);
+        return true;
+      },
+    });
+
+    const result = await agent.run("Edit README.md");
+    const toolMessage = result.messages[4];
+
+    expect(toolMessage?.role).toBe("tool");
+    if (toolMessage?.role !== "tool") {
+      throw new Error("Expected a tool message.");
+    }
+    expect(toolMessage.toolName).toBe("edit_file");
+    expect(toolMessage.isError).toBeUndefined();
+    expect(JSON.parse(toolMessage.content)).toMatchObject({
+      path: "README.md",
+      replacements: 1,
+    });
+    expect(previews).toHaveLength(1);
+    expect(previews[0]).toContain("-hello old world");
+    expect(previews[0]).toContain("+hello new world");
+    await expect(readFile(join(root, "README.md"), "utf8")).resolves.toBe(
+      "hello new world\n",
+    );
+  });
+
+  test("does not write when edit_file confirmation rejects the preview", async () => {
+    await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "read_file",
+                arguments: {
+                  path: "README.md",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_2",
+                name: "edit_file",
+                arguments: {
+                  path: "README.md",
+                  oldText: "old",
+                  newText: "new",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("not edited"),
+    ];
+    const previews: Array<string | undefined> = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+      confirmToolCall: (_toolCall, _tool, preview) => {
+        previews.push(preview);
+        return false;
+      },
+    });
+
+    const result = await agent.run("Edit README.md");
+
+    expect(previews).toHaveLength(1);
+    expect(previews[0]).toContain("-hello old world");
+    expect(previews[0]).toContain("+hello new world");
+    expect(result.messages[4]).toEqual({
+      role: "tool",
+      toolCallId: "call_2",
+      toolName: "edit_file",
+      content: "Tool edit_file requires confirmation for write access.",
+      isError: true,
+    });
+    await expect(readFile(join(root, "README.md"), "utf8")).resolves.toBe(
+      "hello old world\n",
+    );
+  });
+
+  test("requires read_file before the default edit_file tool", async () => {
+    await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "edit_file",
+                arguments: {
+                  path: "README.md",
+                  oldText: "old",
+                  newText: "new",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("could not edit"),
+    ];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+      confirmToolCall: () => true,
+    });
+
+    const result = await agent.run("Edit README.md");
+
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "File must be read with read_file before edit_file: README.md",
+      isError: true,
+    });
+    await expect(readFile(join(root, "README.md"), "utf8")).resolves.toBe(
+      "hello old world\n",
+    );
+  });
+
+  test("rejects edit_file when a file changed after read_file", async () => {
+    await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "read_file",
+                arguments: {
+                  path: "README.md",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_2",
+                name: "edit_file",
+                arguments: {
+                  path: "README.md",
+                  oldText: "old",
+                  newText: "new",
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("could not edit"),
+    ];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses, [], (index) => {
+        if (index === 1) {
+          writeFileSync(join(root, "README.md"), "external old change\n", "utf8");
+        }
+      }),
+      confirmToolCall: () => true,
+    });
+
+    const result = await agent.run("Edit README.md");
+
+    expect(result.messages[4]).toEqual({
+      role: "tool",
+      toolCallId: "call_2",
+      toolName: "edit_file",
+      content:
+        "File changed since it was read. Read it again before edit_file: README.md",
+      isError: true,
+    });
+    await expect(readFile(join(root, "README.md"), "utf8")).resolves.toBe(
+      "external old change\n",
+    );
+  });
+
+  test("rejects the default run_command tool without confirmation", async () => {
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "run_command",
+                arguments: {
+                  command: process.execPath,
+                  args: ["--version"],
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("not run"),
+    ];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+    });
+
+    const result = await agent.run("Run bun version");
+
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "run_command",
+      content: "Tool run_command requires confirmation for execute access.",
+      isError: true,
+    });
+  });
+
+  test("runs the default run_command tool after confirmation", async () => {
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "run_command",
+                arguments: {
+                  command: process.execPath,
+                  args: ["--version"],
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("ran"),
+    ];
+    const previews: Array<string | undefined> = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+      confirmToolCall: (_toolCall, _tool, preview) => {
+        previews.push(preview);
+        return true;
+      },
+    });
+
+    const result = await agent.run("Run bun version");
+    const toolMessage = result.messages[2];
+
+    expect(toolMessage?.role).toBe("tool");
+    if (toolMessage?.role !== "tool") {
+      throw new Error("Expected a tool message.");
+    }
+    expect(toolMessage.toolName).toBe("run_command");
+    expect(toolMessage.isError).toBeUndefined();
+    expect(previews).toHaveLength(1);
+    expect(previews[0]).toContain(process.execPath);
+    expect(JSON.parse(toolMessage.content)).toMatchObject({
+      command: process.execPath,
+      args: ["--version"],
+      cwd: ".",
+      exitCode: 0,
+      timedOut: false,
     });
   });
 
@@ -330,11 +733,13 @@ function createTextResponse(text: string): ModelResponse {
 function createSequenceStream(
   responses: ModelResponse[],
   requests: ModelRequest[] = [],
+  onRequest?: (index: number, request: ModelRequest) => void,
 ) {
   let index = 0;
 
   return (_: Model, request: ModelRequest): ModelStream => {
     requests.push(request);
+    onRequest?.(index, request);
     const response = responses[index];
     index += 1;
     if (!response) {

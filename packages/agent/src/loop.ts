@@ -12,6 +12,8 @@ import type {
   AgentStopReason,
   AgentStreamFunction,
   AgentTool,
+  AgentToolConfirmation,
+  AgentToolRisk,
 } from "./types.js";
 
 export interface AgentLoopOptions {
@@ -22,6 +24,7 @@ export interface AgentLoopOptions {
   maxTurns: number;
   messages: Message[];
   stream: AgentStreamFunction;
+  confirmToolCall?: AgentToolConfirmation;
   emit: AgentEventSink;
 }
 
@@ -113,7 +116,17 @@ async function executeToolCall(
     return;
   }
 
+  const risk = getToolRisk(tool);
   try {
+    const allowed = await confirmToolCallIfNeeded(options, toolCall, tool, risk);
+    if (!allowed) {
+      await appendToolResult(options, turn, toolCall, {
+        content: `Tool ${toolCall.name} requires confirmation for ${risk} access.`,
+        isError: true,
+      });
+      return;
+    }
+
     const content = await tool.execute(toolCall.arguments);
     await appendToolResult(options, turn, toolCall, {
       content,
@@ -125,6 +138,30 @@ async function executeToolCall(
       isError: true,
     });
   }
+}
+
+function getToolRisk(tool: AgentTool<any>): AgentToolRisk {
+  return tool.risk ?? "read";
+}
+
+async function confirmToolCallIfNeeded(
+  options: AgentLoopOptions,
+  toolCall: ToolCall,
+  tool: AgentTool<any>,
+  risk: AgentToolRisk,
+): Promise<boolean> {
+  if (risk === "read") {
+    return true;
+  }
+  if (!options.confirmToolCall) {
+    return false;
+  }
+
+  const preview = tool.preview
+    ? await tool.preview(toolCall.arguments)
+    : undefined;
+
+  return Boolean(await options.confirmToolCall(toolCall, tool, preview));
 }
 
 async function appendToolResult(
@@ -182,4 +219,3 @@ function toAgentStopReason(
 
   return responseStopReason;
 }
-

@@ -18,10 +18,24 @@ export type AgentStreamFunction = (
 
 export type AgentStopReason = "end_turn" | "max_tokens" | "max_turns";
 
+export type AgentToolRisk = "read" | "write" | "execute";
+
+export type AgentToolPreview = string;
+
 export interface AgentTool<TArgs extends JsonValue = JsonValue>
   extends ToolDefinition<TArgs> {
+  risk?: AgentToolRisk;
+  preview?: (
+    args: TArgs,
+  ) => Promise<AgentToolPreview | undefined> | AgentToolPreview | undefined;
   execute: (args: TArgs) => Promise<string> | string;
 }
+
+export type AgentToolConfirmation = (
+  toolCall: ToolCall,
+  tool: AgentTool<any>,
+  preview?: AgentToolPreview,
+) => Promise<boolean> | boolean;
 
 export interface AgentOptions {
   model: Model;
@@ -30,6 +44,7 @@ export interface AgentOptions {
   maxTurns?: number;
   messages?: readonly Message[];
   stream?: AgentStreamFunction;
+  confirmToolCall?: AgentToolConfirmation;
 }
 
 export interface AgentRunResult {
@@ -67,4 +82,3 @@ export type AgentEvent =
 export type AgentEventListener = (event: AgentEvent) => Promise<void> | void;
 
 export type AgentEventSink = (event: AgentEvent) => Promise<void>;
-

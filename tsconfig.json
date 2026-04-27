@@ -12,13 +12,13 @@
       "path": "./packages/agent"
     },
     {
-      "path": "./packages/tui"
+      "path": "./packages/coding-agent"
     },
     {
       "path": "./packages/web-ui"
     },
     {
-      "path": "./packages/coding-agent"
+      "path": "./packages/tui"
     }
   ]
 }

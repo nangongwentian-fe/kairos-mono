@@ -10,8 +10,11 @@
     "typecheck": "bun run --workspaces typecheck",
     "test:agent": "bun test packages/agent/test",
     "test:agent:integration": "bun --env-file=.env.local test packages/agent/test/agent.integration.test.ts",
-    "test:coding-agent": "bun test packages/coding-agent/test/read-file.test.ts packages/coding-agent/test/list-dir.test.ts packages/coding-agent/test/grep.test.ts packages/coding-agent/test/coding-agent.test.ts",
+    "test:coding-agent": "bun test packages/coding-agent/test/read-file.test.ts packages/coding-agent/test/list-dir.test.ts packages/coding-agent/test/grep.test.ts packages/coding-agent/test/edit-file.test.ts packages/coding-agent/test/run-command.test.ts packages/coding-agent/test/coding-agent.test.ts packages/coding-agent/test/coding-task.test.ts packages/coding-agent/test/coding-agent-workflow.test.ts",
     "test:coding-agent:integration": "bun --env-file=.env.local test packages/coding-agent/test/read-file.integration.test.ts",
+    "test:coding-agent:workflow:integration": "bun --env-file=.env.local test packages/coding-agent/test/coding-agent-workflow.integration.test.ts",
+    "test:tui": "bun test packages/tui/test",
+    "kairos": "bun --env-file=.env.local packages/tui/src/cli.ts",
     "clean": "bun run --workspaces clean"
   },
   "devDependencies": {

@@ -169,6 +169,197 @@ describe("@kairos/agent minimal loop", () => {
     expect(result.stopReason).toBe("end_turn");
   });
 
+  test("executes read tools without confirmation", async () => {
+    let executed = false;
+    const readTool: AgentTool = {
+      name: "read_file",
+      description: "Read a file",
+      risk: "read",
+      execute: () => {
+        executed = true;
+        return "read result";
+      },
+    };
+    const toolResponse = createToolCallResponse("call_1", "read_file");
+    const finalResponse = createTextResponse("读完了。");
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [readTool],
+      stream: createSequenceStream([toolResponse, finalResponse]),
+    });
+
+    const result = await agent.run("读文件");
+
+    expect(executed).toBe(true);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "read_file",
+      content: "read result",
+    });
+  });
+
+  test("rejects write tools without confirmation", async () => {
+    let executed = false;
+    const writeTool: AgentTool = {
+      name: "edit_file",
+      description: "Edit a file",
+      risk: "write",
+      execute: () => {
+        executed = true;
+        return "edited";
+      },
+    };
+    const toolResponse = createToolCallResponse("call_1", "edit_file");
+    const finalResponse = createTextResponse("没有修改。");
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [writeTool],
+      stream: createSequenceStream([toolResponse, finalResponse]),
+    });
+
+    const result = await agent.run("改文件");
+
+    expect(executed).toBe(false);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "Tool edit_file requires confirmation for write access.",
+      isError: true,
+    });
+    expect(result.stopReason).toBe("end_turn");
+  });
+
+  test("executes write tools after confirmation", async () => {
+    let executed = false;
+    const confirmations: Array<{
+      toolCallName: string;
+      toolName: string;
+      preview: string | undefined;
+    }> = [];
+    const writeTool: AgentTool = {
+      name: "edit_file",
+      description: "Edit a file",
+      risk: "write",
+      preview: () => "diff preview",
+      execute: () => {
+        executed = true;
+        return "edited";
+      },
+    };
+    const toolResponse = createToolCallResponse("call_1", "edit_file");
+    const finalResponse = createTextResponse("修改完成。");
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [writeTool],
+      confirmToolCall: (toolCall, tool, preview) => {
+        confirmations.push({
+          toolCallName: toolCall.name,
+          toolName: tool.name,
+          preview,
+        });
+        return true;
+      },
+      stream: createSequenceStream([toolResponse, finalResponse]),
+    });
+
+    const result = await agent.run("改文件");
+
+    expect(executed).toBe(true);
+    expect(confirmations).toEqual([
+      {
+        toolCallName: "edit_file",
+        toolName: "edit_file",
+        preview: "diff preview",
+      },
+    ]);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "edited",
+    });
+  });
+
+  test("rejects write tools when confirmation rejects the preview", async () => {
+    let executed = false;
+    const previews: Array<string | undefined> = [];
+    const writeTool: AgentTool = {
+      name: "edit_file",
+      description: "Edit a file",
+      risk: "write",
+      preview: () => "diff preview",
+      execute: () => {
+        executed = true;
+        return "edited";
+      },
+    };
+    const toolResponse = createToolCallResponse("call_1", "edit_file");
+    const finalResponse = createTextResponse("没有修改。");
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [writeTool],
+      confirmToolCall: (_toolCall, _tool, preview) => {
+        previews.push(preview);
+        return false;
+      },
+      stream: createSequenceStream([toolResponse, finalResponse]),
+    });
+
+    const result = await agent.run("改文件");
+
+    expect(executed).toBe(false);
+    expect(previews).toEqual(["diff preview"]);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "Tool edit_file requires confirmation for write access.",
+      isError: true,
+    });
+  });
+
+  test("records preview errors as tool errors", async () => {
+    let executed = false;
+    let confirmed = false;
+    const writeTool: AgentTool = {
+      name: "edit_file",
+      description: "Edit a file",
+      risk: "write",
+      preview: () => {
+        throw new Error("preview failed");
+      },
+      execute: () => {
+        executed = true;
+        return "edited";
+      },
+    };
+    const toolResponse = createToolCallResponse("call_1", "edit_file");
+    const finalResponse = createTextResponse("没有修改。");
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [writeTool],
+      confirmToolCall: () => {
+        confirmed = true;
+        return true;
+      },
+      stream: createSequenceStream([toolResponse, finalResponse]),
+    });
+
+    const result = await agent.run("改文件");
+
+    expect(executed).toBe(false);
+    expect(confirmed).toBe(false);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "edit_file",
+      content: "preview failed",
+      isError: true,
+    });
+  });
+
   test("stops before executing tools when maxTurns is reached", async () => {
     let executed = false;
     const tool: AgentTool = {
@@ -222,6 +413,25 @@ function createTextResponse(text: string): ModelResponse {
       ],
     },
     stopReason: "end_turn",
+  };
+}
+
+function createToolCallResponse(id: string, name: string): ModelResponse {
+  return {
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          call: {
+            id,
+            name,
+            arguments: {},
+          },
+        },
+      ],
+    },
+    stopReason: "tool_calls",
   };
 }
 
@@ -289,4 +499,3 @@ function createEvents(response: ModelResponse): ModelStreamEvent[] {
 
   return events;
 }
-

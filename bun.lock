@@ -29,12 +29,16 @@
       "dependencies": {
         "@kairos/agent": "workspace:*",
         "@kairos/ai": "workspace:*",
-        "@kairos/tui": "workspace:*",
       },
     },
     "packages/tui": {
       "name": "@kairos/tui",
       "version": "0.0.0",
+      "dependencies": {
+        "@kairos/agent": "workspace:*",
+        "@kairos/ai": "workspace:*",
+        "@kairos/coding-agent": "workspace:*",
+      },
     },
     "packages/web-ui": {
       "name": "@kairos/web-ui",
