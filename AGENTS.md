@@ -14,12 +14,13 @@
 - `packages/ai` 优先参考 `pi-mono`、`ai`、`typescript-sdk`、`openai-agents-js` 的模型抽象、provider 接入、流式协议、工具调用事件映射。
 - `packages/agent` 优先参考 `pi-mono`、`openai-agents-js`、`langgraphjs`、`deepagentsjs`、`opencode` 的 agent loop、消息状态、工具执行、工具结果回填、循环停止条件、循环保护。
 - `packages/coding-agent` 优先参考 `pi-mono`、`opencode`、`deepagentsjs`、`voltagent`、`mastra` 的 coding 工具、工具组合、工作区边界、默认 prompt、agent 工厂设计。
-- `packages/tui` 和 `packages/web-ui` 优先参考 `claude-code`、`codex`、`opencode`、`openai-agents-js`、`langgraphjs` 的消息呈现、流式更新、工具调用可视化、运行状态和错误呈现。
+- `packages/tui`、`packages/coding-tui` 和 `packages/web-ui` 优先参考 `claude-code`、`codex`、`opencode`、`openai-agents-js`、`langgraphjs` 的消息呈现、流式更新、工具调用可视化、运行状态和错误呈现。
 
 ## 当前设计判断
 
 - `createCodingAgent()` 保持为薄工厂：组合 `@kairos/agent`、默认 coding system prompt、内置工具和用户传入工具。
 - 自定义工具同名时覆盖内置工具，方便测试打桩，也方便后续替换内置实现。
-- 当前 `@kairos/tui -> @kairos/coding-agent` 是为了先做最小可运行演示；后续当 TUI 组件变多、`web-ui` 想复用消息渲染、或需要更贴近 `pi-mono` 时，优先考虑拆成通用 `@kairos/tui-core` 和组合 coding agent 的 `@kairos/coding-tui`。
+- `@kairos/tui` 是通用终端 UI/event helper；`@kairos/coding-tui` 组合 `@kairos/coding-agent` 和 `@kairos/tui` 提供 coding CLI，不要让 `@kairos/tui` 反向依赖 `@kairos/coding-agent`。
 - 暂时不要把 memory、workflow、subagent、checkpoint、human interrupt、sandbox 全部放进 `createCodingAgent()`；这些等场景明确后单独加。
 - 不要提前引入完整权限系统、持久化、上下文压缩、多 agent 编排、插件系统等重能力，除非当前任务明确需要。
+- 新增或调整 `@kairos/*` package 依赖时，必须同步检查 `docs/package-boundaries.md` 和 `test/package-boundaries.test.ts`；依赖方向默认保持 `ai -> agent -> coding-agent`，通用 UI 层不要反向依赖产品层。

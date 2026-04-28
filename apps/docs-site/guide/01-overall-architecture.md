@@ -20,7 +20,13 @@ packages/coding-agent
   面向代码任务的默认 prompt、工具集合、工具策略、任务封装
 
 packages/tui
-  命令行交互、流式展示、工具事件展示
+  通用终端 IO、Agent 事件展示、JSONL 事件协议
+
+packages/coding-tui
+  组合 coding-agent 和 tui，提供 Kairos coding CLI
+
+packages/web-ui
+  Web UI 状态层和后续可复用组件
 ```
 
 ## 依赖方向
@@ -30,7 +36,9 @@ packages/tui
 | `@kairos/ai` | 外部模型 SDK | `agent`、`coding-agent`、`tui` |
 | `@kairos/agent` | `@kairos/ai` | `coding-agent`、`tui` |
 | `@kairos/coding-agent` | `@kairos/agent` | `tui` |
-| `@kairos/tui` | `@kairos/coding-agent` | 文档站点 |
+| `@kairos/tui` | `@kairos/agent`、`@kairos/ai` | `coding-agent` |
+| `@kairos/coding-tui` | `@kairos/coding-agent`、`@kairos/tui` | 文档站点 |
+| `@kairos/web-ui` | `@kairos/agent`、`@kairos/ai` | `coding-agent` |
 | `@kairos/docs-site` | VitePress | 运行时代码 |
 
 ## 关键判断

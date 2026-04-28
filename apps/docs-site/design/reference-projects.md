@@ -11,7 +11,7 @@
 | `@kairos/ai` | `pi-mono`、`ai`、`typescript-sdk`、`openai-agents-js` | provider 抽象、流式协议、工具调用事件 |
 | `@kairos/agent` | `pi-mono`、`openai-agents-js`、`langgraphjs`、`deepagentsjs`、`opencode` | 运行循环、工具结果、停止条件 |
 | `@kairos/coding-agent` | `pi-mono`、`opencode`、`deepagentsjs`、`voltagent`、`mastra` | 文件工具、工作区边界、默认 prompt、任务状态 |
-| `@kairos/tui` | `claude-code`、`codex`、`opencode` | 流式展示、工具事件、错误呈现 |
+| `@kairos/tui`、`@kairos/coding-tui` | `claude-code`、`codex`、`opencode`、`pi-mono` | 流式展示、工具事件、错误呈现、UI/产品分层 |
 
 ## 取舍方式
 
