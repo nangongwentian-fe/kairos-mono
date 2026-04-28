@@ -135,6 +135,55 @@ describe("@kairos/tui runTuiTask", () => {
     );
   });
 
+  test("renders todo_write as a task list", async () => {
+    const chunks: string[] = [];
+    const io: TuiIo = {
+      write: (text) => {
+        chunks.push(text);
+      },
+      confirm: () => true,
+    };
+
+    const run = await runTuiTask({
+      root,
+      model: TEST_MODEL,
+      input: "Plan README.md work.",
+      io,
+      stream: createSequenceStream([
+        createToolCallResponse("call_todo", "todo_write", {
+          todos: [
+            {
+              id: "inspect",
+              content: "Inspect README.md",
+              status: "completed",
+            },
+            {
+              id: "edit",
+              content: "Edit README.md",
+              status: "in_progress",
+            },
+            {
+              id: "test",
+              content: "Run tests",
+              status: "pending",
+            },
+          ],
+        }),
+        createTextResponse("planned"),
+      ]),
+    });
+    const output = chunks.join("");
+
+    expect(run.result.stopReason).toBe("end_turn");
+    expect(output).toContain("todos: 1/3 completed");
+    expect(output).toContain("  [x] Inspect README.md");
+    expect(output).toContain("  [~] Edit README.md");
+    expect(output).toContain("  [ ] Run tests");
+    expect(output).not.toContain("tool todo_write started");
+    expect(output).not.toContain("tool todo_write done");
+    expect(output).toContain("assistant: planned");
+  });
+
   test("renders a workspace change summary after the run", async () => {
     await git(root, ["init"]);
     await git(root, ["add", "README.md"]);

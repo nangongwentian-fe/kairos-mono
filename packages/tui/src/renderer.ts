@@ -4,6 +4,7 @@ import {
   formatToolCallSummary,
   formatToolResult,
 } from "./format.js";
+import { formatTodoUpdate, parseTodoWriteResult } from "./todo.js";
 
 interface PendingTool {
   startedAt: number;
@@ -48,6 +49,10 @@ export function createTuiEventRenderer(io: TuiIo): TuiEventRenderer {
         pendingTools.set(event.toolCall.id, {
           startedAt: Date.now(),
         });
+        if (event.toolCall.name === "todo_write") {
+          return;
+        }
+
         await io.write(`tool ${formatToolCallSummary(event.toolCall)} started\n`);
         return;
       }
@@ -56,6 +61,14 @@ export function createTuiEventRenderer(io: TuiIo): TuiEventRenderer {
         const pending = pendingTools.get(event.toolCall.id);
         pendingTools.delete(event.toolCall.id);
         const elapsed = pending ? ` ${Date.now() - pending.startedAt}ms` : "";
+        if (event.toolCall.name === "todo_write") {
+          const todoUpdate = parseTodoWriteResult(event.message.content);
+          if (todoUpdate) {
+            await io.write(formatTodoUpdate(todoUpdate));
+            return;
+          }
+        }
+
         await io.write(`tool ${event.toolCall.name} done${elapsed}\n`);
         return;
       }

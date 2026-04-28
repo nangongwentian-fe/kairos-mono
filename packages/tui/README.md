@@ -42,6 +42,7 @@ objects from `@kairos/agent`.
 ```json
 {"version":1,"type":"run_start","input":"Read README.md and summarize it.","root":"/repo","model":"opencode-go/kimi-k2.6"}
 {"version":1,"type":"assistant_delta","text":"README.md says..."}
+{"version":1,"type":"todo_update","id":"call_todo","todos":[{"id":"inspect","content":"Inspect README.md","status":"completed"}],"pendingCount":0,"inProgressCount":0,"completedCount":1}
 {"version":1,"type":"run_end","stopReason":"end_turn","turns":1}
 ```
 
@@ -81,7 +82,8 @@ Current scope:
 - `--json` emits stable versioned JSONL events through `packages/tui/src/json-events.ts`.
 - `runTuiTask()` calls `runCodingTask()` and renders live events as plain terminal text.
 - Assistant text is streamed inline.
-- Tool start, tool success, tool error, and task completion are printed as separate lines.
+- Tool start, tool success, tool error, todo updates, and task completion are printed as separate lines.
+- `todo_write` renders as a task list in TUI output and as a `todo_update` JSONL event in `--json` output.
 - Normal TUI output includes a workspace change summary after the run. It records file status only, without full diff text.
 - `--record` still writes the full workspace diff to the JSON run record.
 - Write and execute tools use `io.confirm()` by default.

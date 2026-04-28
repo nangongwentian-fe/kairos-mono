@@ -137,6 +137,61 @@ describe("@kairos/tui JSON events", () => {
     ]);
   });
 
+  test("maps todo_write results into a dedicated todo update event", () => {
+    const todos = [
+      { id: "inspect", content: "Inspect README.md", status: "completed" },
+      { id: "edit", content: "Edit README.md", status: "in_progress" },
+      { id: "test", content: "Run tests", status: "pending" },
+    ];
+    const toolCall = {
+      id: "call_todo",
+      name: "todo_write",
+      arguments: { todos },
+    };
+    const content = JSON.stringify({
+      oldTodos: [],
+      newTodos: todos,
+      pendingCount: 1,
+      inProgressCount: 1,
+      completedCount: 1,
+      metadata: { todos },
+    });
+
+    expect(
+      toTuiJsonEvents(
+        {
+          type: "tool_end",
+          turn: 1,
+          toolCall,
+          message: {
+            role: "tool",
+            toolCallId: "call_todo",
+            toolName: "todo_write",
+            content,
+          },
+        },
+        context,
+      ),
+    ).toEqual([
+      {
+        version: 1,
+        type: "tool_end",
+        id: "call_todo",
+        name: "todo_write",
+        content,
+      },
+      {
+        version: 1,
+        type: "todo_update",
+        id: "call_todo",
+        todos,
+        pendingCount: 1,
+        inProgressCount: 1,
+        completedCount: 1,
+      },
+    ]);
+  });
+
   test("maps run end and formats JSON lines", () => {
     const [event] = toTuiJsonEvents(
       {

@@ -35,4 +35,10 @@ export type {
   TuiJsonToolEndEvent,
   TuiJsonToolErrorEvent,
   TuiJsonToolStartEvent,
+  TuiJsonTodoUpdateEvent,
 } from "./json-events.js";
+export type {
+  TuiTodoItem,
+  TuiTodoStatus,
+  TuiTodoUpdate,
+} from "./todo.js";
