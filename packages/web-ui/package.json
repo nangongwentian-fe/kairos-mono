@@ -7,7 +7,12 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "echo \"@kairos/web-ui build placeholder\"",
+    "test": "bun test test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "echo \"@kairos/web-ui clean placeholder\""
+  },
+  "dependencies": {
+    "@kairos/ai": "workspace:*",
+    "@kairos/agent": "workspace:*"
   }
 }
