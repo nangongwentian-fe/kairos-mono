@@ -38,18 +38,31 @@
         "@kairos/ai": "workspace:*",
       },
     },
+    "packages/coding-tui": {
+      "name": "@kairos/coding-tui",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kairos/agent": "workspace:*",
+        "@kairos/ai": "workspace:*",
+        "@kairos/coding-agent": "workspace:*",
+        "@kairos/tui": "workspace:*",
+      },
+    },
     "packages/tui": {
       "name": "@kairos/tui",
       "version": "0.0.0",
       "dependencies": {
         "@kairos/agent": "workspace:*",
         "@kairos/ai": "workspace:*",
-        "@kairos/coding-agent": "workspace:*",
       },
     },
     "packages/web-ui": {
       "name": "@kairos/web-ui",
       "version": "0.0.0",
+      "dependencies": {
+        "@kairos/agent": "workspace:*",
+        "@kairos/ai": "workspace:*",
+      },
     },
   },
   "packages": {
@@ -160,6 +173,8 @@
     "@kairos/ai": ["@kairos/ai@workspace:packages/ai"],
 
     "@kairos/coding-agent": ["@kairos/coding-agent@workspace:packages/coding-agent"],
+
+    "@kairos/coding-tui": ["@kairos/coding-tui@workspace:packages/coding-tui"],
 
     "@kairos/docs-site": ["@kairos/docs-site@workspace:apps/docs-site"],
 

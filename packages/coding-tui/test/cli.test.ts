@@ -8,7 +8,7 @@ import {
   resolveTuiCliInput,
 } from "../src/cli";
 
-describe("@kairos/tui CLI args", () => {
+describe("@kairos/coding-tui CLI args", () => {
   test("uses OpenCode Go defaults and current directory root", () => {
     const parsed = parseTuiCliArgs(["Read", "README.md"], {
       cwd: "/repo",
@@ -106,7 +106,7 @@ describe("@kairos/tui CLI args", () => {
 
   test("prints the executable bun command in help", () => {
     expect(createTuiCliHelp()).toContain(
-      'bun --env-file=.env.local packages/tui/src/cli.ts [options] "task"',
+      'bun --env-file=.env.local packages/coding-tui/src/cli.ts [options] "task"',
     );
     expect(createTuiCliHelp()).toContain("echo \"task\"");
     expect(createTuiCliHelp()).toContain("--print");

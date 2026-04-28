@@ -3,8 +3,7 @@ export const KAIROS_TUI_PACKAGE = "@kairos/tui";
 export {
   createDefaultTuiIo,
   createTuiToolConfirmation,
-  runTuiTask,
-} from "./task.js";
+} from "./io.js";
 export { createTuiEventRenderer } from "./renderer.js";
 export {
   TUI_JSON_EVENT_VERSION,
@@ -20,8 +19,6 @@ export {
   truncate,
 } from "./format.js";
 export type {
-  RunTuiTaskOptions,
-  RunTuiTaskResult,
   TuiEventRenderer,
   TuiIo,
   TuiToolConfirmation,

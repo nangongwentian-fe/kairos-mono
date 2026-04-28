@@ -3,13 +3,13 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
-import type { TuiJsonEvent } from "../src/index";
+import type { TuiJsonEvent } from "@kairos/tui";
 
 const hasOpenCodeApiKey = Boolean(process.env.OPENCODE_API_KEY);
 const maybeTest = hasOpenCodeApiKey ? test : test.skip;
 const TEST_TIMEOUT_MS = 90_000;
 
-describe("@kairos/tui JSON integration", () => {
+describe("@kairos/coding-tui JSON integration", () => {
   maybeTest(
     "streams todo_update and run_end from a real opencode-go CLI run",
     async () => {
@@ -65,7 +65,7 @@ function runCliProcess(args: readonly string[]): Promise<{
 }> {
   return new Promise((resolveProcess, reject) => {
     const root = repoRoot();
-    const child = spawn(process.execPath, [join(root, "packages/tui/src/cli.ts"), ...args], {
+    const child = spawn(process.execPath, [join(root, "packages/coding-tui/src/cli.ts"), ...args], {
       cwd: root,
       env: process.env,
       shell: false,

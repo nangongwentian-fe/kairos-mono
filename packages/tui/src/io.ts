@@ -1,43 +1,8 @@
-import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { createInterface } from "node:readline/promises";
 import type { AgentToolConfirmation } from "@kairos/agent";
-import { runCodingTask } from "@kairos/coding-agent";
 import { formatToolArguments } from "./format.js";
-import { createTuiEventRenderer } from "./renderer.js";
-import type {
-  RunTuiTaskOptions,
-  RunTuiTaskResult,
-  TuiIo,
-  TuiToolConfirmation,
-} from "./types.js";
-import { formatWorkspaceSummary } from "./workspace-summary.js";
-
-export async function runTuiTask(
-  options: RunTuiTaskOptions,
-): Promise<RunTuiTaskResult> {
-  const { io = createDefaultTuiIo(), onEvent, confirmToolCall, ...taskOptions } = options;
-  const renderer = createTuiEventRenderer(io);
-  const tuiConfirmToolCall =
-    confirmToolCall ?? createTuiToolConfirmation(io, renderer.closeAssistantBlock);
-
-  const run = await runCodingTask({
-    ...taskOptions,
-    recordWorkspaceDiff: taskOptions.recordWorkspaceDiff ?? {
-      includeDiff: false,
-    },
-    confirmToolCall: tuiConfirmToolCall,
-    onEvent: async (event) => {
-      await renderer.onEvent(event);
-      await onEvent?.(event);
-    },
-  });
-  const workspaceSummary = formatWorkspaceSummary(run.workspaceDiffReport);
-  if (workspaceSummary) {
-    await io.write(workspaceSummary);
-  }
-
-  return run;
-}
+import type { TuiIo, TuiToolConfirmation } from "./types.js";
 
 export function createDefaultTuiIo(): TuiIo {
   return {

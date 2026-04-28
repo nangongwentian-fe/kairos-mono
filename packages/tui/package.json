@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@kairos/ai": "workspace:*",
-    "@kairos/agent": "workspace:*",
-    "@kairos/coding-agent": "workspace:*"
+    "@kairos/agent": "workspace:*"
   }
 }

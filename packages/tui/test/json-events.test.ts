@@ -7,6 +7,7 @@ import {
   formatTuiJsonEvent,
   toTuiJsonEvents,
 } from "../src/json-events";
+import type { TuiTodoItem } from "../src/todo";
 
 const TEST_MODEL: Model = {
   id: "kimi-k2.6",
@@ -138,7 +139,7 @@ describe("@kairos/tui JSON events", () => {
   });
 
   test("maps todo_write results into a dedicated todo update event", () => {
-    const todos = [
+    const todos: TuiTodoItem[] = [
       { id: "inspect", content: "Inspect README.md", status: "completed" },
       { id: "edit", content: "Edit README.md", status: "in_progress" },
       { id: "test", content: "Run tests", status: "pending" },

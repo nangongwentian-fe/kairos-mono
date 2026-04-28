@@ -36,7 +36,7 @@
 32. 实现 `run_command`，支持运行测试和项目命令。
 33. 增加输出截断、超时和错误返回。
 34. 把工具文件从单一 `index.ts` 拆分到 `tools/`。
-35. 实现 `@kairos/tui` 最小命令行界面。
+35. 实现最小命令行界面。
 36. TUI 支持接收任务并展示流式文本。
 37. TUI 支持展示工具调用和工具结果。
 38. 用真实 OpenCode Go 模型跑 TUI 验证。
@@ -48,6 +48,7 @@
 44. 为 Todo 增加多轮未更新提醒。
 45. 在 `@kairos/agent` 加 middleware 机制。
 46. 用 middleware 支持工具执行前后扩展。
+47. 参考 pi-mono 分层，把 coding CLI 从 `@kairos/tui` 拆到 `@kairos/coding-tui`。
 47. 移除 `AgentTool<any>` 的粗糙类型，改成更明确的泛型。
 48. 加入工具策略设计。
 49. 把具体策略放在 `@kairos/coding-agent`。

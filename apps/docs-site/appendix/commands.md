@@ -11,7 +11,10 @@ bun install
 ```bash
 bun run test:agent
 bun run test:coding-agent
+bun run test:coding-tui
 bun run test:tui
+bun run test:web-ui
+bun run test:deps
 ```
 
 ## 类型检查
@@ -34,7 +37,7 @@ OPENCODE_API_KEY=sk-...
 bun run test:agent:integration
 bun run test:coding-agent:integration
 bun run test:coding-agent:workflow:integration
-bun run test:tui:integration
+bun run test:coding-tui:integration
 ```
 
 ## 运行 TUI

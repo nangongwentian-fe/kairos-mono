@@ -10,8 +10,10 @@ import type {
   ModelResponse,
   ModelStream,
   ModelStreamEvent,
+  JsonObject,
 } from "@kairos/ai";
-import { runTuiTask, type TuiIo } from "../src/index";
+import type { TuiIo } from "@kairos/tui";
+import { runCodingTuiTask } from "../src/index";
 
 const TEST_MODEL: Model = {
   id: "test-model",
@@ -23,7 +25,7 @@ const TEST_MODEL: Model = {
   supportsTools: true,
 };
 
-describe("@kairos/tui runTuiTask", () => {
+describe("@kairos/coding-tui runCodingTuiTask", () => {
   let root: string;
 
   beforeEach(async () => {
@@ -49,7 +51,7 @@ describe("@kairos/tui runTuiTask", () => {
       },
     };
 
-    const run = await runTuiTask({
+    const run = await runCodingTuiTask({
       root,
       model: TEST_MODEL,
       input: "Update README.md.",
@@ -101,7 +103,7 @@ describe("@kairos/tui runTuiTask", () => {
       confirm: () => false,
     };
 
-    const run = await runTuiTask({
+    const run = await runCodingTuiTask({
       root,
       model: TEST_MODEL,
       input: "Update README.md.",
@@ -144,7 +146,7 @@ describe("@kairos/tui runTuiTask", () => {
       confirm: () => true,
     };
 
-    const run = await runTuiTask({
+    const run = await runCodingTuiTask({
       root,
       model: TEST_MODEL,
       input: "Plan README.md work.",
@@ -206,7 +208,7 @@ describe("@kairos/tui runTuiTask", () => {
       confirm: () => true,
     };
 
-    const run = await runTuiTask({
+    const run = await runCodingTuiTask({
       root,
       model: TEST_MODEL,
       input: "Update README.md.",
@@ -252,7 +254,7 @@ function createTextResponse(text: string): ModelResponse {
 function createToolCallResponse(
   id: string,
   name: string,
-  args: Record<string, unknown>,
+  args: JsonObject,
 ): ModelResponse {
   return {
     message: {

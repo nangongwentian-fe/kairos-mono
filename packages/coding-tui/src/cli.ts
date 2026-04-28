@@ -19,8 +19,8 @@ import {
   createTuiJsonEventContext,
   formatTuiJsonEvent,
   toTuiJsonEvents,
-} from "./json-events.js";
-import { runTuiTask } from "./task.js";
+} from "@kairos/tui";
+import { runCodingTuiTask } from "./task.js";
 
 const DEFAULT_MODEL_ID = "kimi-k2.6";
 const DEFAULT_PROVIDER = "opencode-go";
@@ -153,7 +153,7 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
     let run: RunCodingTaskResult;
 
     if (parsed.outputMode === "tui") {
-      run = await runTuiTask({
+      run = await runCodingTuiTask({
         root: parsed.root,
         model,
         input,
@@ -230,8 +230,8 @@ export function formatPrintOutput(run: RunCodingTaskResult): string {
 export function createTuiCliHelp(): string {
   return [
     "Usage:",
-    '  bun --env-file=.env.local packages/tui/src/cli.ts [options] "task"',
-    "  echo \"task\" | bun --env-file=.env.local packages/tui/src/cli.ts -",
+    '  bun --env-file=.env.local packages/coding-tui/src/cli.ts [options] "task"',
+    "  echo \"task\" | bun --env-file=.env.local packages/coding-tui/src/cli.ts -",
     "",
     "Options:",
     "  --print       Print only the final assistant text",

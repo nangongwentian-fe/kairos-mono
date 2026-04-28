@@ -1,6 +1,8 @@
+import type { JsonValue } from "@kairos/ai";
+
 export type TuiTodoStatus = "pending" | "in_progress" | "completed";
 
-export interface TuiTodoItem {
+export interface TuiTodoItem extends Record<string, JsonValue> {
   id: string;
   content: string;
   status: TuiTodoStatus;
