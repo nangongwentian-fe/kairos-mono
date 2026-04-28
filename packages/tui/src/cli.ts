@@ -157,6 +157,7 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
         root: parsed.root,
         model,
         input,
+        recordWorkspaceDiff: parsed.recordPath ? true : { includeDiff: false },
       });
     } else {
       const jsonContext = createTuiJsonEventContext({
@@ -168,6 +169,7 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
         root: parsed.root,
         model,
         input,
+        recordWorkspaceDiff: Boolean(parsed.recordPath),
         onEvent:
           parsed.outputMode === "json"
             ? (event) => {
@@ -186,6 +188,8 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
           model,
           input,
           trace: run.trace,
+          workspaceDiff: run.workspaceDiff,
+          workspaceDiffReport: run.workspaceDiffReport,
           result: run.result,
         }),
         parsed.recordPath,

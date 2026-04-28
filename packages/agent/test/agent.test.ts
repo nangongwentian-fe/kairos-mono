@@ -7,6 +7,7 @@ import {
 } from "../src/index";
 import type {
   Model,
+  ModelRequest,
   ModelResponse,
   ModelStream,
   ModelStreamEvent,
@@ -360,6 +361,106 @@ describe("@kairos/agent minimal loop", () => {
     });
   });
 
+  test("lets middleware update model requests before streaming", async () => {
+    const requests: ModelRequest[] = [];
+    const agent = new Agent({
+      model: TEST_MODEL,
+      systemPrompt: "Base prompt.",
+      middleware: [
+        {
+          name: "append_prompt",
+          beforeModelRequest: (request, context) => ({
+            ...request,
+            systemPrompt: `${request.systemPrompt} Turn ${context.turn}.`,
+          }),
+        },
+      ],
+      stream: createSequenceStream([createTextResponse("完成。")], requests),
+    });
+
+    await agent.run("运行");
+
+    expect(requests[0]?.systemPrompt).toBe("Base prompt. Turn 1.");
+  });
+
+  test("lets middleware block tool calls before execution", async () => {
+    let executed = false;
+    const tool: AgentTool = {
+      name: "dangerous_tool",
+      description: "Dangerous tool",
+      execute: () => {
+        executed = true;
+        return "executed";
+      },
+    };
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [tool],
+      middleware: [
+        {
+          name: "block_dangerous_tool",
+          beforeToolCall: (toolCall) => {
+            if (toolCall.name === "dangerous_tool") {
+              return {
+                block: true,
+                reason: "Blocked by middleware.",
+              };
+            }
+          },
+        },
+      ],
+      stream: createSequenceStream([
+        createToolCallResponse("call_1", "dangerous_tool"),
+        createTextResponse("已拦截。"),
+      ]),
+    });
+
+    const result = await agent.run("运行危险工具");
+
+    expect(executed).toBe(false);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "dangerous_tool",
+      content: "Blocked by middleware.",
+      isError: true,
+    });
+  });
+
+  test("lets middleware update tool result messages", async () => {
+    const tool: AgentTool = {
+      name: "read_file",
+      description: "Read a file",
+      execute: () => "raw result",
+    };
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [tool],
+      middleware: [
+        {
+          name: "annotate_tool_result",
+          afterToolResult: (message) => ({
+            ...message,
+            content: `[annotated] ${message.content}`,
+          }),
+        },
+      ],
+      stream: createSequenceStream([
+        createToolCallResponse("call_1", "read_file"),
+        createTextResponse("完成。"),
+      ]),
+    });
+
+    const result = await agent.run("读文件");
+
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "read_file",
+      content: "[annotated] raw result",
+    });
+  });
+
   test("stops before executing tools when maxTurns is reached", async () => {
     let executed = false;
     const tool: AgentTool = {
@@ -437,7 +538,7 @@ function createToolCallResponse(id: string, name: string): ModelResponse {
 
 function createSequenceStream(
   responses: ModelResponse[],
-  requests: unknown[] = [],
+  requests: ModelRequest[] = [],
 ): AgentStreamFunction {
   let index = 0;
 

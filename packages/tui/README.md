@@ -77,12 +77,14 @@ console.log(run.result.stopReason);
 Current scope:
 
 - `packages/tui/src/cli.ts` provides a minimal Bun CLI entry.
-- The CLI supports normal TUI output, `--print` final-text output, `--json` event output, `--record` explicit run records, and `-` for standard input.
+- The CLI supports normal TUI output, `--print` final-text output, `--json` event output, `--record` explicit run records with workspace diff, and `-` for standard input.
 - `--json` emits stable versioned JSONL events through `packages/tui/src/json-events.ts`.
 - `runTuiTask()` calls `runCodingTask()` and renders live events as plain terminal text.
 - Assistant text is streamed inline.
 - Tool start, tool success, tool error, and task completion are printed as separate lines.
+- Normal TUI output includes a workspace change summary after the run. It records file status only, without full diff text.
+- `--record` still writes the full workspace diff to the JSON run record.
 - Write and execute tools use `io.confirm()` by default.
 - Tool confirmations print tool arguments and preview text, including edit diffs.
 
-Not included yet: package binary build, full-screen layout, scrollback, markdown rendering, keyboard shortcuts, multi-session state, persistence, and theming.
+Not included yet: package binary build, full-screen layout, scrollback, markdown rendering, keyboard shortcuts, interactive diff expansion, multi-session state, persistence, and theming.

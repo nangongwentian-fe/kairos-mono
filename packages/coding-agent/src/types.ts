@@ -1,10 +1,11 @@
 import type {
   AgentEventListener,
+  AgentMiddleware,
   AgentRunResult,
   AgentStreamFunction,
   AgentTrace,
-  AgentTool,
   AgentToolConfirmation,
+  AnyAgentTool,
 } from "@kairos/agent";
 import type { JsonValue, Message, Model } from "@kairos/ai";
 
@@ -113,23 +114,123 @@ export interface RunCommandResult {
   stderrTruncated: boolean;
 }
 
+export type TodoStatus = "pending" | "in_progress" | "completed";
+
+export interface TodoItem extends Record<string, JsonValue> {
+  id: string;
+  content: string;
+  status: TodoStatus;
+}
+
+export interface TodoWriteToolArgs extends Record<string, JsonValue> {
+  todos: TodoItem[];
+}
+
+export interface TodoWriteResult {
+  oldTodos: TodoItem[];
+  newTodos: TodoItem[];
+  pendingCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  metadata: {
+    todos: TodoItem[];
+  };
+}
+
+export interface TodoReminderOptions {
+  turnsSinceTodoWrite?: number;
+  turnsBetweenReminders?: number;
+}
+
+export interface CodingToolPolicyOptions {
+  protectedPaths?: readonly string[];
+  additionalProtectedPaths?: readonly string[];
+  additionalBlockedCommandPatterns?: readonly RegExp[];
+}
+
+export interface CodingPermissionMiddlewareOptions
+  extends CodingToolPolicyOptions {
+  root: string;
+}
+
+export type WorkspaceChangedFileStatus =
+  | "added"
+  | "copied"
+  | "deleted"
+  | "modified"
+  | "renamed"
+  | "unknown"
+  | "untracked";
+
+export interface WorkspaceChangedFile {
+  path: string;
+  oldPath?: string;
+  status: WorkspaceChangedFileStatus;
+  rawStatus: string;
+}
+
+export type WorkspaceDiffStatus =
+  | "clean"
+  | "dirty"
+  | "error"
+  | "not_git_repository";
+
+export interface WorkspaceDiffOptions {
+  gitPath?: string;
+  includeDiff?: boolean;
+  maxDiffBytes?: number;
+}
+
+export interface WorkspaceGuardOptions {
+  gitPath?: string;
+}
+
+export interface CollectWorkspaceDiffOptions extends WorkspaceDiffOptions {
+  root: string;
+}
+
+export interface WorkspaceDiffResult {
+  root: string;
+  gitRoot?: string;
+  status: WorkspaceDiffStatus;
+  isGitRepository: boolean;
+  changedFiles: WorkspaceChangedFile[];
+  diff: string;
+  diffTruncated: boolean;
+  error?: string;
+}
+
+export interface WorkspaceDiffReport {
+  before: WorkspaceDiffResult;
+  after: WorkspaceDiffResult;
+  hadPreExistingChanges: boolean;
+  preExistingChangedFiles: WorkspaceChangedFile[];
+}
+
 export interface CodingAgentOptions {
   root: string;
   model: Model;
   systemPrompt?: string;
-  tools?: readonly AgentTool<any>[];
+  tools?: readonly AnyAgentTool[];
   maxTurns?: number;
   messages?: readonly Message[];
   stream?: AgentStreamFunction;
   confirmToolCall?: AgentToolConfirmation;
+  middleware?: readonly AgentMiddleware[];
+  todoReminder?: false | TodoReminderOptions;
+  toolPolicy?: false | CodingToolPolicyOptions;
 }
 
 export interface RunCodingTaskOptions extends CodingAgentOptions {
   input: string;
   onEvent?: AgentEventListener;
+  recordWorkspaceDiff?: boolean | WorkspaceDiffOptions;
+  workspaceGuard?: boolean | WorkspaceGuardOptions;
 }
 
 export interface RunCodingTaskResult {
   result: AgentRunResult;
   trace: AgentTrace;
+  workspaceDiff?: WorkspaceDiffResult;
+  workspaceDiffReport?: WorkspaceDiffReport;
 }

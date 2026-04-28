@@ -29,6 +29,17 @@ const agent = new Agent({
       },
     },
   ],
+  middleware: [
+    {
+      name: "add_context",
+      beforeModelRequest(request) {
+        return {
+          ...request,
+          systemPrompt: `${request.systemPrompt}\nPrefer concise answers.`,
+        };
+      },
+    },
+  ],
 });
 agent.subscribe(recorder.onEvent);
 
@@ -45,6 +56,8 @@ console.log(recorder.trace.items);
 - Runs `read` tools automatically.
 - Requires `confirmToolCall` for `write` and `execute` tools.
 - Supports optional tool previews before confirmation.
+- Supports lightweight middleware for updating model requests, blocking tool calls,
+  and updating tool results.
 - Provides an in-memory trace recorder through `createTraceRecorder()`.
 - Appends tool results back into the transcript.
 - Continues until the model stops asking for tools.

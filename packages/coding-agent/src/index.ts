@@ -11,6 +11,8 @@ export {
   writeCodingRunRecord,
 } from "./run-record.js";
 export { runCodingTask } from "./task.js";
+export { createCodingPermissionMiddleware } from "./tool-policy.js";
+export { collectWorkspaceDiff } from "./workspace-diff.js";
 export {
   createCodingAgentFileState,
   createEditFileTool,
@@ -18,11 +20,15 @@ export {
   createListDirTool,
   createReadFileTool,
   createRunCommandTool,
+  createTodoWriteTool,
 } from "./tools/index.js";
 export type {
   CodingAgentFileSnapshot,
   CodingAgentFileState,
   CodingAgentOptions,
+  CodingPermissionMiddlewareOptions,
+  CodingToolPolicyOptions,
+  CollectWorkspaceDiffOptions,
   EditFileResult,
   EditFileToolArgs,
   EditFileToolOptions,
@@ -42,6 +48,18 @@ export type {
   RunCodingTaskResult,
   ReadFileToolArgs,
   ReadFileToolOptions,
+  TodoItem,
+  TodoReminderOptions,
+  TodoStatus,
+  TodoWriteResult,
+  TodoWriteToolArgs,
+  WorkspaceChangedFile,
+  WorkspaceChangedFileStatus,
+  WorkspaceDiffOptions,
+  WorkspaceDiffReport,
+  WorkspaceDiffResult,
+  WorkspaceDiffStatus,
+  WorkspaceGuardOptions,
 } from "./types.js";
 export type {
   CodingRunRecord,

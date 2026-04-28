@@ -31,20 +31,62 @@ export interface AgentTool<TArgs extends JsonValue = JsonValue>
   execute: (args: TArgs) => Promise<string> | string;
 }
 
+export type AnyAgentTool = AgentTool<never>;
+
 export type AgentToolConfirmation = (
   toolCall: ToolCall,
-  tool: AgentTool<any>,
+  tool: AnyAgentTool,
   preview?: AgentToolPreview,
 ) => Promise<boolean> | boolean;
+
+export interface AgentMiddlewareContext {
+  turn: number;
+  model: Model;
+  tools: readonly AnyAgentTool[];
+  messages: readonly Message[];
+}
+
+export interface AgentToolCallContext extends AgentMiddlewareContext {
+  tool?: AnyAgentTool;
+  risk?: AgentToolRisk;
+}
+
+export interface AgentToolResultContext extends AgentMiddlewareContext {
+  toolCall: ToolCall;
+  tool?: AnyAgentTool;
+}
+
+export interface AgentToolCallDecision {
+  block: true;
+  reason: string;
+  isError?: boolean;
+}
+
+export interface AgentMiddleware {
+  name: string;
+  beforeModelRequest?: (
+    request: ModelRequest,
+    context: AgentMiddlewareContext,
+  ) => Promise<ModelRequest | void> | ModelRequest | void;
+  beforeToolCall?: (
+    toolCall: ToolCall,
+    context: AgentToolCallContext,
+  ) => Promise<AgentToolCallDecision | void> | AgentToolCallDecision | void;
+  afterToolResult?: (
+    message: ToolResultMessage,
+    context: AgentToolResultContext,
+  ) => Promise<ToolResultMessage | void> | ToolResultMessage | void;
+}
 
 export interface AgentOptions {
   model: Model;
   systemPrompt?: string;
-  tools?: readonly AgentTool<any>[];
+  tools?: readonly AnyAgentTool[];
   maxTurns?: number;
   messages?: readonly Message[];
   stream?: AgentStreamFunction;
   confirmToolCall?: AgentToolConfirmation;
+  middleware?: readonly AgentMiddleware[];
 }
 
 export interface AgentRunResult {

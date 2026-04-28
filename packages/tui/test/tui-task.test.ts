@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -133,6 +134,55 @@ describe("@kairos/tui runTuiTask", () => {
       "hello old world\n",
     );
   });
+
+  test("renders a workspace change summary after the run", async () => {
+    await git(root, ["init"]);
+    await git(root, ["add", "README.md"]);
+    await git(root, [
+      "-c",
+      "user.email=kairos@example.com",
+      "-c",
+      "user.name=Kairos Test",
+      "commit",
+      "-m",
+      "initial commit",
+    ]);
+    await writeFile(join(root, "notes.txt"), "pre-existing\n", "utf8");
+
+    const chunks: string[] = [];
+    const io: TuiIo = {
+      write: (text) => {
+        chunks.push(text);
+      },
+      confirm: () => true,
+    };
+
+    const run = await runTuiTask({
+      root,
+      model: TEST_MODEL,
+      input: "Update README.md.",
+      io,
+      stream: createSequenceStream([
+        createToolCallResponse("call_read", "read_file", {
+          path: "README.md",
+        }),
+        createToolCallResponse("call_edit", "edit_file", {
+          path: "README.md",
+          oldText: "old",
+          newText: "new",
+        }),
+        createTextResponse("updated"),
+      ]),
+    });
+    const output = chunks.join("");
+
+    expect(run.workspaceDiffReport?.after.diff).toBe("");
+    expect(output).toContain("workspace changes:");
+    expect(output).toContain("  modified README.md");
+    expect(output).toContain("  untracked notes.txt");
+    expect(output).toContain("pre-existing changes:");
+    expect(output).toContain("  untracked notes.txt");
+  });
 });
 
 function createTextResponse(text: string): ModelResponse {
@@ -236,4 +286,32 @@ function createEvents(response: ModelResponse): ModelStreamEvent[] {
   });
 
   return events;
+}
+
+function git(root: string, args: readonly string[]): Promise<void> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn("git", args, {
+      cwd: root,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", reject);
+    child.on("close", (exitCode) => {
+      if (exitCode === 0) {
+        resolvePromise();
+        return;
+      }
+
+      reject(new Error(stderr || stdout || `git exited with code ${exitCode}`));
+    });
+  });
 }

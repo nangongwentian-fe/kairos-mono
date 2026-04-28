@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import type { AgentRunResult, AgentTrace } from "@kairos/agent";
 import type { Model } from "@kairos/ai";
+import type { WorkspaceDiffReport, WorkspaceDiffResult } from "../src/index";
 import {
   CODING_RUN_RECORD_VERSION,
   createCodingRunRecord,
@@ -51,6 +52,37 @@ const TEST_TRACE: AgentTrace = {
   result: TEST_RESULT,
 };
 
+const TEST_WORKSPACE_DIFF: WorkspaceDiffResult = {
+  root: "/repo",
+  gitRoot: "/repo",
+  status: "dirty",
+  isGitRepository: true,
+  changedFiles: [
+    {
+      path: "README.md",
+      status: "modified",
+      rawStatus: " M",
+    },
+  ],
+  diff: "diff --git a/README.md b/README.md\n",
+  diffTruncated: false,
+};
+
+const TEST_WORKSPACE_DIFF_REPORT: WorkspaceDiffReport = {
+  before: {
+    root: "/repo",
+    gitRoot: "/repo",
+    status: "clean",
+    isGitRepository: true,
+    changedFiles: [],
+    diff: "",
+    diffTruncated: false,
+  },
+  after: TEST_WORKSPACE_DIFF,
+  hadPreExistingChanges: false,
+  preExistingChangedFiles: [],
+};
+
 describe("@kairos/coding-agent run records", () => {
   let tempDir: string | undefined;
 
@@ -69,6 +101,8 @@ describe("@kairos/coding-agent run records", () => {
       model: TEST_MODEL,
       input: "Read README.md",
       trace: TEST_TRACE,
+      workspaceDiff: TEST_WORKSPACE_DIFF,
+      workspaceDiffReport: TEST_WORKSPACE_DIFF_REPORT,
       result: TEST_RESULT,
     });
 
@@ -80,6 +114,8 @@ describe("@kairos/coding-agent run records", () => {
       model: "opencode-go/kimi-k2.6",
       input: "Read README.md",
       trace: TEST_TRACE,
+      workspaceDiff: TEST_WORKSPACE_DIFF,
+      workspaceDiffReport: TEST_WORKSPACE_DIFF_REPORT,
       result: TEST_RESULT,
     });
   });

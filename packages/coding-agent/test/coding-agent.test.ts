@@ -89,6 +89,7 @@ describe("@kairos/coding-agent createCodingAgent", () => {
       "list_dir",
       "grep",
       "read_file",
+      "todo_write",
       "edit_file",
       "run_command",
     ]);
@@ -713,6 +714,212 @@ describe("@kairos/coding-agent createCodingAgent", () => {
     });
     expect(requests[0]?.tools?.filter((tool) => tool.name === "read_file")).toHaveLength(1);
   });
+
+  test("creates an agent with the default todo_write tool", async () => {
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "todo_write",
+                arguments: {
+                  todos: [
+                    {
+                      id: "inspect",
+                      content: "Inspect existing tools",
+                      status: "completed",
+                    },
+                    {
+                      id: "implement",
+                      content: "Implement todo_write",
+                      status: "in_progress",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createTextResponse("tracked"),
+    ];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses),
+    });
+
+    const result = await agent.run("Track progress");
+    const toolMessage = result.messages[2];
+
+    expect(toolMessage?.role).toBe("tool");
+    if (toolMessage?.role !== "tool") {
+      throw new Error("Expected a tool message.");
+    }
+    expect(toolMessage.toolName).toBe("todo_write");
+    expect(toolMessage.isError).toBeUndefined();
+    expect(JSON.parse(toolMessage.content)).toMatchObject({
+      pendingCount: 0,
+      inProgressCount: 1,
+      completedCount: 1,
+      metadata: {
+        todos: [
+          {
+            id: "inspect",
+            content: "Inspect existing tools",
+            status: "completed",
+          },
+          {
+            id: "implement",
+            content: "Implement todo_write",
+            status: "in_progress",
+          },
+        ],
+      },
+    });
+  });
+
+  test("adds a todo reminder after configured turns without todo_write", async () => {
+    const responses: ModelResponse[] = [
+      createListDirToolCallResponse("call_1"),
+      createListDirToolCallResponse("call_2"),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      maxTurns: 3,
+      todoReminder: {
+        turnsSinceTodoWrite: 2,
+        turnsBetweenReminders: 2,
+      },
+      stream: createSequenceStream(responses, requests),
+    });
+
+    await agent.run("Inspect the project without planning");
+
+    expect(requests[0]?.systemPrompt).toBe(DEFAULT_CODING_AGENT_SYSTEM_PROMPT);
+    expect(requests[1]?.systemPrompt).not.toContain(
+      "todo_write has not been used recently",
+    );
+    expect(requests[2]?.systemPrompt).toContain(
+      "todo_write has not been used recently",
+    );
+  });
+
+  test("keeps todo reminders spaced apart", async () => {
+    const responses: ModelResponse[] = [
+      createListDirToolCallResponse("call_1"),
+      createListDirToolCallResponse("call_2"),
+      createListDirToolCallResponse("call_3"),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      maxTurns: 4,
+      todoReminder: {
+        turnsSinceTodoWrite: 1,
+        turnsBetweenReminders: 2,
+      },
+      stream: createSequenceStream(responses, requests),
+    });
+
+    await agent.run("Inspect the project without planning");
+
+    expect(requests[1]?.systemPrompt).toContain(
+      "todo_write has not been used recently",
+    );
+    expect(requests[2]?.systemPrompt).not.toContain(
+      "todo_write has not been used recently",
+    );
+    expect(requests[3]?.systemPrompt).toContain(
+      "todo_write has not been used recently",
+    );
+  });
+
+  test("does not add todo reminders after recent todo_write usage", async () => {
+    const responses: ModelResponse[] = [
+      {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              call: {
+                id: "call_1",
+                name: "todo_write",
+                arguments: {
+                  todos: [
+                    {
+                      id: "inspect",
+                      content: "Inspect the project",
+                      status: "in_progress",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        stopReason: "tool_calls",
+      },
+      createListDirToolCallResponse("call_2"),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      maxTurns: 3,
+      todoReminder: {
+        turnsSinceTodoWrite: 2,
+        turnsBetweenReminders: 2,
+      },
+      stream: createSequenceStream(responses, requests),
+    });
+
+    await agent.run("Track and inspect the project");
+
+    expect(requests[1]?.systemPrompt).not.toContain(
+      "todo_write has not been used recently",
+    );
+    expect(requests[2]?.systemPrompt).not.toContain(
+      "todo_write has not been used recently",
+    );
+  });
+
+  test("can disable todo reminders", async () => {
+    const responses: ModelResponse[] = [
+      createListDirToolCallResponse("call_1"),
+      createListDirToolCallResponse("call_2"),
+      createListDirToolCallResponse("call_3"),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      maxTurns: 4,
+      todoReminder: false,
+      stream: createSequenceStream(responses, requests),
+    });
+
+    await agent.run("Inspect the project without planning");
+
+    expect(
+      requests.some((request) =>
+        request.systemPrompt?.includes("todo_write has not been used recently"),
+      ),
+    ).toBe(false);
+  });
 });
 
 function createTextResponse(text: string): ModelResponse {
@@ -727,6 +934,27 @@ function createTextResponse(text: string): ModelResponse {
       ],
     },
     stopReason: "end_turn",
+  };
+}
+
+function createListDirToolCallResponse(toolCallId: string): ModelResponse {
+  return {
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          call: {
+            id: toolCallId,
+            name: "list_dir",
+            arguments: {
+              path: ".",
+            },
+          },
+        },
+      ],
+    },
+    stopReason: "tool_calls",
   };
 }
 

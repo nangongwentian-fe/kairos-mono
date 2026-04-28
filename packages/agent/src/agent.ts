@@ -7,17 +7,19 @@ import type {
   AgentRunResult,
   AgentState,
   AgentStreamFunction,
-  AgentTool,
+  AgentMiddleware,
+  AnyAgentTool,
   AgentToolConfirmation,
 } from "./types.js";
 
 export class Agent {
   private readonly model: Model;
   private readonly systemPrompt?: string;
-  private readonly tools: readonly AgentTool<any>[];
+  private readonly tools: readonly AnyAgentTool[];
   private readonly maxTurns: number;
   private readonly stream: AgentStreamFunction;
   private readonly confirmToolCall?: AgentToolConfirmation;
+  private readonly middleware: readonly AgentMiddleware[];
   private readonly listeners = new Set<AgentEventListener>();
   private messages: Message[];
   private running = false;
@@ -33,6 +35,7 @@ export class Agent {
     this.maxTurns = options.maxTurns ?? 8;
     this.stream = options.stream ?? streamModel;
     this.confirmToolCall = options.confirmToolCall;
+    this.middleware = options.middleware ?? [];
     this.messages = [...(options.messages ?? [])];
   }
 
@@ -72,6 +75,7 @@ export class Agent {
         messages: this.messages,
         stream: this.stream,
         confirmToolCall: this.confirmToolCall,
+        middleware: this.middleware,
         emit: (event) => this.emit(event),
       });
     } finally {

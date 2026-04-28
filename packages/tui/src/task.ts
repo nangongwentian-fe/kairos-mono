@@ -10,6 +10,7 @@ import type {
   TuiIo,
   TuiToolConfirmation,
 } from "./types.js";
+import { formatWorkspaceSummary } from "./workspace-summary.js";
 
 export async function runTuiTask(
   options: RunTuiTaskOptions,
@@ -19,14 +20,23 @@ export async function runTuiTask(
   const tuiConfirmToolCall =
     confirmToolCall ?? createTuiToolConfirmation(io, renderer.closeAssistantBlock);
 
-  return await runCodingTask({
+  const run = await runCodingTask({
     ...taskOptions,
+    recordWorkspaceDiff: taskOptions.recordWorkspaceDiff ?? {
+      includeDiff: false,
+    },
     confirmToolCall: tuiConfirmToolCall,
     onEvent: async (event) => {
       await renderer.onEvent(event);
       await onEvent?.(event);
     },
   });
+  const workspaceSummary = formatWorkspaceSummary(run.workspaceDiffReport);
+  if (workspaceSummary) {
+    await io.write(workspaceSummary);
+  }
+
+  return run;
 }
 
 export function createDefaultTuiIo(): TuiIo {

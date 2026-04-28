@@ -3,6 +3,7 @@ import type { Model } from "@kairos/ai";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import type { WorkspaceDiffReport, WorkspaceDiffResult } from "./types.js";
 
 export const CODING_RUN_RECORD_VERSION = 1;
 
@@ -14,6 +15,8 @@ export interface CodingRunRecord {
   model: string;
   input: string;
   trace: AgentTrace;
+  workspaceDiff?: WorkspaceDiffResult;
+  workspaceDiffReport?: WorkspaceDiffReport;
   result: AgentRunResult;
 }
 
@@ -24,6 +27,8 @@ export interface CreateCodingRunRecordOptions {
   model: Model | string;
   input: string;
   trace: AgentTrace;
+  workspaceDiff?: WorkspaceDiffResult;
+  workspaceDiffReport?: WorkspaceDiffReport;
   result: AgentRunResult;
 }
 
@@ -38,6 +43,10 @@ export function createCodingRunRecord(
     model: formatCodingRunRecordModel(options.model),
     input: options.input,
     trace: options.trace,
+    ...(options.workspaceDiff ? { workspaceDiff: options.workspaceDiff } : {}),
+    ...(options.workspaceDiffReport
+      ? { workspaceDiffReport: options.workspaceDiffReport }
+      : {}),
     result: options.result,
   };
 }

@@ -4,6 +4,8 @@
 
 - 以后设计或实现 `packages/*` 下任何 package 时，先参考 `/Users/zhengwenjie/Documents/People/references`。
 - 以后提出 `packages/*` 的下一步建议前，也要先做小范围 reference scan，再给建议和最小设计边界。
+- 以后借鉴 references 时不能只看同名工具、公开接口和 prompt，要沿着完整实现路径查：入口、状态结构、运行循环、工具执行、提醒/约束、错误处理、测试和文档；给设计建议前要区分“已确认借鉴”“未找到对应机制”“暂不纳入当前阶段”。
+- references 里如果存在多种实现方案，不要默认照搬其中一个；要比较它们的取舍，吸收各自优点，结合 Kairos 当前分层和阶段边界设计更合适的方案。
 - 默认原则是借鉴设计经验，不照搬复杂实现。
 - 当前重点参考项目：`pi-mono`、`opencode`、`claude-code`、`codex`、`deerflow-harness`、`openai-agents-js`、`langgraphjs`、`deepagentsjs`、`mastra`、`voltagent`、`ai`、`typescript-sdk`。
 

@@ -1,13 +1,14 @@
 import type {
   AgentEvent,
   AgentEventListener,
-  AgentRunResult,
-  AgentTool,
-  AgentTrace,
   AgentToolPreview,
+  AnyAgentTool,
 } from "@kairos/agent";
 import type { ToolCall } from "@kairos/ai";
-import type { RunCodingTaskOptions } from "@kairos/coding-agent";
+import type {
+  RunCodingTaskOptions,
+  RunCodingTaskResult,
+} from "@kairos/coding-agent";
 
 export interface TuiIo {
   write: (text: string) => Promise<void> | void;
@@ -20,14 +21,11 @@ export interface RunTuiTaskOptions
   onEvent?: AgentEventListener;
 }
 
-export interface RunTuiTaskResult {
-  result: AgentRunResult;
-  trace: AgentTrace;
-}
+export interface RunTuiTaskResult extends RunCodingTaskResult {}
 
 export interface TuiToolConfirmation {
   toolCall: ToolCall;
-  tool: AgentTool<any>;
+  tool: AnyAgentTool;
   preview?: AgentToolPreview;
 }
 
