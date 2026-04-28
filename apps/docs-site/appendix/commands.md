@@ -34,6 +34,7 @@ OPENCODE_API_KEY=sk-...
 bun run test:agent:integration
 bun run test:coding-agent:integration
 bun run test:coding-agent:workflow:integration
+bun run test:tui:integration
 ```
 
 ## 运行 TUI

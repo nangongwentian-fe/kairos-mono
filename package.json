@@ -18,6 +18,7 @@
     "test:coding-agent:integration": "bun --env-file=.env.local test packages/coding-agent/test/read-file.integration.test.ts",
     "test:coding-agent:workflow:integration": "bun --env-file=.env.local test packages/coding-agent/test/coding-agent-workflow.integration.test.ts",
     "test:tui": "bun test packages/tui/test",
+    "test:tui:integration": "bun --env-file=.env.local test packages/tui/test/tui-json.integration.test.ts",
     "kairos": "bun --env-file=.env.local packages/tui/src/cli.ts",
     "clean": "bun run --workspaces clean"
   },
