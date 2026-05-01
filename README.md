@@ -36,4 +36,5 @@ Run the interactive coding CLI:
 
 ```bash
 bun run kairos
+bun run kairos --resume latest
 ```

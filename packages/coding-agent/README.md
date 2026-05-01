@@ -27,7 +27,11 @@ Use a reusable session for interactive callers:
 
 ```ts
 import { requireModel } from "@kairos/ai";
-import { createCodingSession } from "@kairos/coding-agent";
+import {
+  createCodingSession,
+  createCodingSessionRecord,
+  writeCodingSessionRecord,
+} from "@kairos/coding-agent";
 
 const model = requireModel("opencode-go", "kimi-k2.6");
 const session = createCodingSession({
@@ -37,6 +41,13 @@ const session = createCodingSession({
 
 await session.run("Read README.md.");
 await session.run("Now summarize what you learned.");
+
+const record = createCodingSessionRecord({
+  root: process.cwd(),
+  model,
+  messages: session.state.messages,
+});
+await writeCodingSessionRecord(record);
 ```
 
 Write an explicit run record:
@@ -81,6 +92,7 @@ Current behavior:
 - `createCodingSession` creates one reusable coding agent for multi-turn callers such as interactive CLIs.
 - `runCodingTask` is the one-shot helper built on top of `createCodingSession`.
 - Each `CodingSession.run()` records an in-memory trace, optionally emits live events through `onEvent`, and returns `{ result, trace }`.
+- `createCodingSessionRecord` and `writeCodingSessionRecord` persist local interactive session state when the caller asks for it.
 - `runCodingTask` enables `workspaceGuard` by default. It checks for pre-existing git changes before the first model request and reminds the model not to overwrite or take credit for them. Disable it with `workspaceGuard: false`.
 - `runCodingTask({ recordWorkspaceDiff: true })` also returns a git-backed workspace diff report with `before` and `after` snapshots. `workspaceDiff` is kept as a backward-compatible alias for the `after` snapshot. Non-git directories are reported as `status: "not_git_repository"` instead of throwing.
 - `createCodingRunRecord` and `writeCodingRunRecord` persist one explicit JSON run record when the caller asks for it.
@@ -127,6 +139,7 @@ src
 ├── agent.ts        # createCodingAgent factory
 ├── run-record.ts   # explicit JSON run records
 ├── session.ts      # reusable multi-turn coding session
+├── session-store.ts # local JSON session records
 ├── task.ts         # runCodingTask helper
 ├── tool-policy.ts  # edit_file and run_command guardrails
 ├── todo-reminder.ts # todo_write stale reminder policy

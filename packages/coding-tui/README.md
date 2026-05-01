@@ -19,6 +19,8 @@ Interactive commands:
 ```text
 /help   Show commands
 /clear  Clear conversation state
+/sessions  List saved sessions
+/resume <id|latest>  Resume a saved session
 /exit   Exit interactive mode
 ```
 
@@ -38,6 +40,12 @@ Print agent events as JSON lines:
 
 ```bash
 bun run kairos --json "Read README.md and summarize it."
+```
+
+Resume the newest saved interactive session:
+
+```bash
+bun run kairos --resume latest
 ```
 
 Write one explicit one-shot run record:
@@ -83,6 +91,8 @@ Current scope:
 
 - `packages/coding-tui/src/cli.ts` provides a minimal Bun CLI entry.
 - The default CLI mode is interactive and keeps conversation state across turns.
+- Interactive sessions are stored under `.kairos/sessions/` and ignored by git.
+- `--resume <id|latest>`, `/sessions`, and `/resume <id|latest>` restore saved local sessions.
 - `--print` final-text output, `--json` event output, and `--record` explicit run records stay one-shot for scripts.
 - `-` reads standard input as the initial interactive prompt.
 - `--json` emits stable versioned JSONL events through `@kairos/tui`.

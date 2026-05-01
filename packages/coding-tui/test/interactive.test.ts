@@ -10,6 +10,11 @@ import type {
   ModelStream,
   ModelStreamEvent,
 } from "@kairos/ai";
+import {
+  createCodingSessionRecord,
+  listCodingSessionRecords,
+  writeCodingSessionRecord,
+} from "@kairos/coding-agent";
 import type { TuiIo } from "@kairos/tui";
 import {
   parseCodingTuiInteractiveInput,
@@ -83,6 +88,7 @@ describe("@kairos/coding-tui interactive mode", () => {
     const output = chunks.join("");
     expect(prompts).toEqual(["kairos> ", "kairos> ", "kairos> "]);
     expect(output).toContain("Kairos coding agent interactive mode");
+    expect(output).toContain("Session:");
     expect(output).toContain("> first question");
     expect(output).toContain("assistant: first answer");
     expect(output).toContain("> second question");
@@ -93,6 +99,12 @@ describe("@kairos/coding-tui interactive mode", () => {
       "assistant",
       "user",
     ]);
+
+    const [saved] = await listCodingSessionRecords(join(root, ".kairos", "sessions"));
+    expect(saved).toMatchObject({
+      messageCount: 4,
+      firstUserMessage: "first question",
+    });
   });
 
   test("clears the conversation with /clear", async () => {
@@ -125,6 +137,55 @@ describe("@kairos/coding-tui interactive mode", () => {
     expect(chunks.join("")).toContain("session cleared");
     expect(requests[1]?.messages).toEqual([
       { role: "user", content: "fresh question" },
+    ]);
+  });
+
+  test("lists and resumes saved sessions", async () => {
+    const chunks: string[] = [];
+    const requests: ModelRequest[] = [];
+    const io: TuiIo = {
+      write: (text) => {
+        chunks.push(text);
+      },
+      confirm: () => true,
+    };
+    const record = createCodingSessionRecord({
+      id: "saved-session",
+      root,
+      model: TEST_MODEL,
+      messages: [
+        { role: "user", content: "saved question" },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "saved answer" }],
+        },
+      ],
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    await writeCodingSessionRecord(record);
+
+    await runCodingTuiInteractive({
+      root,
+      model: TEST_MODEL,
+      io,
+      lineReader: createLineReader([
+        "/sessions",
+        "/resume saved-session",
+        "follow up",
+        "/exit",
+      ]),
+      workspaceGuard: false,
+      stream: createSequenceStream(requests, [createTextResponse("followed")]),
+    });
+
+    const output = chunks.join("");
+    expect(output).toContain("Saved sessions:");
+    expect(output).toContain("saved-session");
+    expect(output).toContain("resumed session saved-session");
+    expect(requests[0]?.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
     ]);
   });
 });

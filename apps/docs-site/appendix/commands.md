@@ -45,6 +45,7 @@ bun run test:coding-tui:integration
 ```bash
 bun run kairos
 bun run kairos "读取 README 并总结项目结构"
+bun run kairos --resume latest
 bun run kairos --print "读取 README 并总结项目结构"
 bun run kairos --json "读取 README 并总结项目结构"
 ```

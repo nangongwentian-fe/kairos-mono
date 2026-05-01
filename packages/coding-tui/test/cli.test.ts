@@ -20,6 +20,7 @@ describe("@kairos/coding-tui CLI args", () => {
       outputMode: "tui",
       readStdin: false,
       recordPath: undefined,
+      resumeSessionId: undefined,
       root: "/repo",
       help: false,
     });
@@ -37,6 +38,7 @@ describe("@kairos/coding-tui CLI args", () => {
       outputMode: "tui",
       readStdin: false,
       recordPath: undefined,
+      resumeSessionId: undefined,
       root: "/repo/packages/ai",
       help: false,
     });
@@ -54,6 +56,7 @@ describe("@kairos/coding-tui CLI args", () => {
       outputMode: "tui",
       readStdin: false,
       recordPath: undefined,
+      resumeSessionId: undefined,
       root: "/tmp/project",
       help: false,
     });
@@ -84,6 +87,13 @@ describe("@kairos/coding-tui CLI args", () => {
     ).toMatchObject({
       recordPath: "/tmp/run.json",
     });
+    expect(
+      parseTuiCliArgs(["--resume", "latest"], {
+        cwd: "/repo",
+      }),
+    ).toMatchObject({
+      resumeSessionId: "latest",
+    });
   });
 
   test("rejects unknown options and missing values", () => {
@@ -98,6 +108,9 @@ describe("@kairos/coding-tui CLI args", () => {
     );
     expect(() => parseTuiCliArgs(["--record"], { cwd: "/repo" })).toThrow(
       "Missing value for --record",
+    );
+    expect(() => parseTuiCliArgs(["--resume"], { cwd: "/repo" })).toThrow(
+      "Missing value for --resume",
     );
     expect(() => parseTuiCliArgs(["--print", "--json"], { cwd: "/repo" })).toThrow(
       "--print and --json cannot be used together",
@@ -115,8 +128,10 @@ describe("@kairos/coding-tui CLI args", () => {
     expect(createTuiCliHelp()).toContain("--print");
     expect(createTuiCliHelp()).toContain("--json");
     expect(createTuiCliHelp()).toContain("--record");
+    expect(createTuiCliHelp()).toContain("--resume");
     expect(createTuiCliHelp()).toContain("Interactive commands");
     expect(createTuiCliHelp()).toContain("/clear");
+    expect(createTuiCliHelp()).toContain("/sessions");
   });
 
   test("combines piped stdin with optional prompt text", async () => {

@@ -11,6 +11,18 @@ export {
   formatCodingRunRecordModel,
   writeCodingRunRecord,
 } from "./run-record.js";
+export {
+  CODING_SESSION_RECORD_VERSION,
+  assertSafeCodingSessionId,
+  createCodingSessionRecord,
+  getCodingSessionRecordPath,
+  getDefaultCodingSessionStoreDir,
+  listCodingSessionRecords,
+  readCodingSessionRecord,
+  resolveCodingSessionRecord,
+  updateCodingSessionRecord,
+  writeCodingSessionRecord,
+} from "./session-store.js";
 export { runCodingTask } from "./task.js";
 export { createCodingPermissionMiddleware } from "./tool-policy.js";
 export { collectWorkspaceDiff } from "./workspace-diff.js";
@@ -28,6 +40,9 @@ export type {
   CodingAgentFileState,
   CodingAgentOptions,
   CodingPermissionMiddlewareOptions,
+  CodingSessionRecord,
+  CodingSessionRecordModel,
+  CodingSessionSummary,
   CodingSession,
   CodingSessionOptions,
   CodingSessionRunOptions,

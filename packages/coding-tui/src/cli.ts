@@ -2,6 +2,8 @@
 import { requireModel } from "@kairos/ai";
 import {
   createCodingRunRecord,
+  getDefaultCodingSessionStoreDir,
+  resolveCodingSessionRecord,
   runCodingTask,
   writeCodingRunRecord,
   type RunCodingTaskResult,
@@ -34,6 +36,7 @@ export interface TuiCliArgs {
   outputMode: TuiCliOutputMode;
   readStdin: boolean;
   recordPath?: string;
+  resumeSessionId?: string;
   root: string;
   help: boolean;
 }
@@ -52,6 +55,7 @@ export function parseTuiCliArgs(
   let outputMode: TuiCliOutputMode = "tui";
   let readStdin = false;
   let recordPath: string | undefined;
+  let resumeSessionId: string | undefined;
   let root = cwd;
   let help = false;
 
@@ -81,6 +85,17 @@ export function parseTuiCliArgs(
 
     if (arg.startsWith("--record=")) {
       recordPath = resolve(cwd, readInlineFlagValue(arg, "--record"));
+      continue;
+    }
+
+    if (arg === "--resume") {
+      resumeSessionId = readFlagValue(args, index, "--resume");
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--resume=")) {
+      resumeSessionId = readInlineFlagValue(arg, "--resume");
       continue;
     }
 
@@ -124,6 +139,7 @@ export function parseTuiCliArgs(
     outputMode,
     readStdin,
     recordPath,
+    resumeSessionId,
     root,
     help,
   };
@@ -151,17 +167,33 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
 
   try {
     const model = requireModel(DEFAULT_PROVIDER, parsed.modelId);
+    const sessionStoreDir = getDefaultCodingSessionStoreDir(parsed.root);
     let run: RunCodingTaskResult;
 
     if (parsed.outputMode === "tui") {
       if (!parsed.recordPath) {
+        const sessionRecord = parsed.resumeSessionId
+          ? await resolveCodingSessionRecord(sessionStoreDir, parsed.resumeSessionId)
+          : undefined;
+        if (parsed.resumeSessionId && !sessionRecord) {
+          stderr.write(`Session not found: ${parsed.resumeSessionId}\n`);
+          return 1;
+        }
+
         await runCodingTuiInteractive({
           root: parsed.root,
           model,
           initialInput: input,
           recordWorkspaceDiff: { includeDiff: false },
+          sessionRecord,
+          sessionStoreDir,
         });
         return 0;
+      }
+
+      if (parsed.resumeSessionId) {
+        stderr.write("--resume cannot be used with --record.\n");
+        return 1;
       }
 
       if (!input) {
@@ -176,6 +208,11 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
         recordWorkspaceDiff: true,
       });
     } else {
+      if (parsed.resumeSessionId) {
+        stderr.write("--resume is only supported in interactive mode.\n");
+        return 1;
+      }
+
       const jsonContext = createTuiJsonEventContext({
         input,
         root: parsed.root,
@@ -254,6 +291,7 @@ export function createTuiCliHelp(): string {
     "  --print          Print only the final assistant text and exit",
     "  --json           Print agent events as JSON lines and exit",
     "  --record <path>  Write a one-shot run record to a JSON file",
+    "  --resume <id>    Resume a saved interactive session. Use latest for newest",
     `  --model <id>     OpenCode Go model id. Default: ${DEFAULT_MODEL_ID}`,
     "  --root <path>    Workspace root. Default: current directory",
     "  -h, --help       Show this help message",
@@ -261,6 +299,8 @@ export function createTuiCliHelp(): string {
     "Interactive commands:",
     "  /help   Show commands",
     "  /clear  Clear conversation state",
+    "  /sessions  List saved sessions",
+    "  /resume <id|latest>  Resume a saved session",
     "  /exit   Exit interactive mode",
     "",
   ].join("\n");

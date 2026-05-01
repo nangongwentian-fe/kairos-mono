@@ -254,3 +254,30 @@ export interface RunCodingTaskResult {
   workspaceDiff?: WorkspaceDiffResult;
   workspaceDiffReport?: WorkspaceDiffReport;
 }
+
+export interface CodingSessionRecordModel {
+  provider: string;
+  id: string;
+  name: string;
+}
+
+export interface CodingSessionRecord {
+  version: 1;
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  root: string;
+  model: CodingSessionRecordModel;
+  messages: Message[];
+}
+
+export interface CodingSessionSummary {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  root: string;
+  model: CodingSessionRecordModel;
+  messageCount: number;
+  firstUserMessage?: string;
+  path: string;
+}

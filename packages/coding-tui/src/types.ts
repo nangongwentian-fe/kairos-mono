@@ -2,6 +2,7 @@ import type { AgentEventListener } from "@kairos/agent";
 import type {
   CodingSession,
   CodingSessionOptions,
+  CodingSessionRecord,
   RunCodingTaskOptions,
   RunCodingTaskResult,
 } from "@kairos/coding-agent";
@@ -29,6 +30,8 @@ export type CodingTuiInteractiveInput =
   | { type: "help" }
   | { type: "clear" }
   | { type: "exit" }
+  | { type: "sessions" }
+  | { type: "resume"; id: string }
   | { type: "unknown_command"; command: string };
 
 export type CodingTuiInteractiveCommand =
@@ -42,4 +45,6 @@ export interface RunCodingTuiInteractiveOptions
   onEvent?: AgentEventListener;
   prompt?: string;
   session?: CodingSession;
+  sessionRecord?: CodingSessionRecord;
+  sessionStoreDir?: string;
 }

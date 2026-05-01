@@ -1,6 +1,14 @@
 import {
   createCodingSession,
+  createCodingSessionRecord,
+  getDefaultCodingSessionStoreDir,
+  listCodingSessionRecords,
+  resolveCodingSessionRecord,
+  updateCodingSessionRecord,
+  writeCodingSessionRecord,
   type CodingSession,
+  type CodingSessionRecord,
+  type CodingSessionSummary,
   type CodingSessionRunOptions,
 } from "@kairos/coding-agent";
 import {
@@ -18,6 +26,7 @@ import type {
 import { formatWorkspaceSummary } from "./workspace-summary.js";
 
 const DEFAULT_PROMPT = "kairos> ";
+type InteractiveSessionMessage = CodingSessionRecord["messages"][number];
 
 export async function runCodingTuiInteractive(
   options: RunCodingTuiInteractiveOptions,
@@ -30,13 +39,25 @@ export async function runCodingTuiInteractive(
     prompt = DEFAULT_PROMPT,
     confirmToolCall,
     session: providedSession,
+    sessionRecord: providedSessionRecord,
+    sessionStoreDir,
     ...sessionOptions
   } = options;
   const renderer = createTuiEventRenderer(io);
+  const storeDir =
+    sessionStoreDir ?? getDefaultCodingSessionStoreDir(sessionOptions.root);
+  let activeRecord =
+    providedSessionRecord ??
+    createCodingSessionRecord({
+      root: sessionOptions.root,
+      model: sessionOptions.model,
+      messages: sessionOptions.messages,
+    });
   const session =
     providedSession ??
     createCodingSession({
       ...sessionOptions,
+      messages: activeRecord.messages,
       recordWorkspaceDiff: sessionOptions.recordWorkspaceDiff ?? {
         includeDiff: false,
       },
@@ -50,14 +71,20 @@ export async function runCodingTuiInteractive(
   });
 
   try {
-    await io.write(createInteractiveWelcome());
+    await io.write(createInteractiveWelcome(activeRecord.id));
 
     if (initialInput?.trim()) {
-      await runInteractiveTurn(session, initialInput.trim(), {
-        io,
-        recordWorkspaceDiff: sessionOptions.recordWorkspaceDiff,
-        workspaceGuard: sessionOptions.workspaceGuard,
-      });
+      activeRecord = await runInteractiveTurn(
+        session,
+        activeRecord,
+        storeDir,
+        initialInput.trim(),
+        {
+          io,
+          recordWorkspaceDiff: sessionOptions.recordWorkspaceDiff,
+          workspaceGuard: sessionOptions.workspaceGuard,
+        },
+      );
     }
 
     while (true) {
@@ -85,7 +112,32 @@ export async function runCodingTuiInteractive(
 
       if (parsed.type === "clear") {
         session.reset();
+        activeRecord = await saveInteractiveSession(
+          activeRecord,
+          storeDir,
+          session.state.messages,
+        );
         await io.write("session cleared\n");
+        continue;
+      }
+
+      if (parsed.type === "sessions") {
+        await io.write(
+          formatInteractiveSessions(await listCodingSessionRecords(storeDir)),
+        );
+        continue;
+      }
+
+      if (parsed.type === "resume") {
+        const record = await resolveCodingSessionRecord(storeDir, parsed.id);
+        if (!record) {
+          await io.write(`session not found: ${parsed.id}\n`);
+          continue;
+        }
+
+        activeRecord = record;
+        session.reset(record.messages);
+        await io.write(`resumed session ${record.id}\n`);
         continue;
       }
 
@@ -95,11 +147,17 @@ export async function runCodingTuiInteractive(
         continue;
       }
 
-      await runInteractiveTurn(session, parsed.input, {
-        io,
-        recordWorkspaceDiff: sessionOptions.recordWorkspaceDiff,
-        workspaceGuard: sessionOptions.workspaceGuard,
-      });
+      activeRecord = await runInteractiveTurn(
+        session,
+        activeRecord,
+        storeDir,
+        parsed.input,
+        {
+          io,
+          recordWorkspaceDiff: sessionOptions.recordWorkspaceDiff,
+          workspaceGuard: sessionOptions.workspaceGuard,
+        },
+      );
     }
   } finally {
     unsubscribe();
@@ -120,6 +178,7 @@ export function parseCodingTuiInteractiveInput(
   }
 
   const [command = ""] = input.split(/\s+/, 1);
+  const [, argument] = input.split(/\s+/, 2);
   switch (command) {
     case "/exit":
     case "/quit":
@@ -128,14 +187,19 @@ export function parseCodingTuiInteractiveInput(
       return { type: "help" };
     case "/clear":
       return { type: "clear" };
+    case "/sessions":
+      return { type: "sessions" };
+    case "/resume":
+      return { type: "resume", id: argument ?? "latest" };
     default:
       return { type: "unknown_command", command };
   }
 }
 
-export function createInteractiveWelcome(): string {
+export function createInteractiveWelcome(sessionId?: string): string {
   return [
     "Kairos coding agent interactive mode",
+    ...(sessionId ? [`Session: ${sessionId}`] : []),
     "Type /help for commands, /exit to quit.",
     "",
   ].join("\n");
@@ -146,6 +210,8 @@ export function createInteractiveHelp(): string {
     "Commands:",
     "  /help   Show this help",
     "  /clear  Clear conversation state",
+    "  /sessions  List saved sessions",
+    "  /resume <id|latest>  Resume a saved session",
     "  /exit   Exit interactive mode",
     "",
   ].join("\n");
@@ -157,10 +223,12 @@ function createDefaultLineReader(): CodingTuiLineReader {
 
 async function runInteractiveTurn(
   session: CodingSession,
+  record: CodingSessionRecord,
+  storeDir: string,
   input: string,
   options: Pick<RunCodingTuiInteractiveOptions, "io"> &
     Omit<CodingSessionRunOptions, "onEvent">,
-): Promise<void> {
+): Promise<CodingSessionRecord> {
   try {
     const run = await session.run(input, {
       recordWorkspaceDiff: options.recordWorkspaceDiff,
@@ -170,11 +238,40 @@ async function runInteractiveTurn(
     if (workspaceSummary) {
       await options.io?.write(workspaceSummary);
     }
+    return await saveInteractiveSession(record, storeDir, run.result.messages);
   } catch (error) {
     await options.io?.write(`error: ${formatInteractiveError(error)}\n`);
+    return record;
   }
 }
 
 function formatInteractiveError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function saveInteractiveSession(
+  record: CodingSessionRecord,
+  storeDir: string,
+  messages: readonly InteractiveSessionMessage[],
+): Promise<CodingSessionRecord> {
+  const nextRecord = updateCodingSessionRecord(record, { messages });
+  await writeCodingSessionRecord(nextRecord, storeDir);
+  return nextRecord;
+}
+
+function formatInteractiveSessions(
+  sessions: readonly CodingSessionSummary[],
+): string {
+  if (sessions.length === 0) {
+    return "no saved sessions\n";
+  }
+
+  return [
+    "Saved sessions:",
+    ...sessions.map((session) => {
+      const title = session.firstUserMessage ?? "(empty)";
+      return `  ${session.id}  ${session.updatedAt}  ${session.messageCount} messages  ${title}`;
+    }),
+    "",
+  ].join("\n");
 }
