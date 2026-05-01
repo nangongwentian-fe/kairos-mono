@@ -298,7 +298,7 @@ export function createTuiCliHelp(): string {
     "",
     "Interactive commands:",
     "  /help   Show commands",
-    "  /clear  Clear conversation state",
+    "  /new    Start a new conversation",
     "  /sessions  List saved sessions",
     "  /resume <id|latest>  Resume a saved session",
     "  /exit   Exit interactive mode",

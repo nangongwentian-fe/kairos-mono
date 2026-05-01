@@ -28,7 +28,7 @@ export type CodingTuiInteractiveInput =
   | { type: "empty" }
   | { type: "input"; input: string }
   | { type: "help" }
-  | { type: "clear" }
+  | { type: "new" }
   | { type: "exit" }
   | { type: "sessions" }
   | { type: "resume"; id: string }

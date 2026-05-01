@@ -18,7 +18,7 @@ Interactive commands:
 
 ```text
 /help   Show commands
-/clear  Clear conversation state
+/new    Start a new conversation
 /sessions  List saved sessions
 /resume <id|latest>  Resume a saved session
 /exit   Exit interactive mode
@@ -92,6 +92,7 @@ Current scope:
 - `packages/coding-tui/src/cli.ts` provides a minimal Bun CLI entry.
 - The default CLI mode is interactive and keeps conversation state across turns.
 - Interactive sessions are stored under `.kairos/sessions/` and ignored by git.
+- `/new` starts a new conversation without overwriting the previous session.
 - `--resume <id|latest>`, `/sessions`, and `/resume <id|latest>` restore saved local sessions.
 - `--print` final-text output, `--json` event output, and `--record` explicit run records stay one-shot for scripts.
 - `-` reads standard input as the initial interactive prompt.

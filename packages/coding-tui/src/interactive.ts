@@ -110,14 +110,13 @@ export async function runCodingTuiInteractive(
         continue;
       }
 
-      if (parsed.type === "clear") {
+      if (parsed.type === "new") {
+        activeRecord = createCodingSessionRecord({
+          root: sessionOptions.root,
+          model: sessionOptions.model,
+        });
         session.reset();
-        activeRecord = await saveInteractiveSession(
-          activeRecord,
-          storeDir,
-          session.state.messages,
-        );
-        await io.write("session cleared\n");
+        await io.write(`started new session ${activeRecord.id}\n`);
         continue;
       }
 
@@ -185,8 +184,8 @@ export function parseCodingTuiInteractiveInput(
       return { type: "exit" };
     case "/help":
       return { type: "help" };
-    case "/clear":
-      return { type: "clear" };
+    case "/new":
+      return { type: "new" };
     case "/sessions":
       return { type: "sessions" };
     case "/resume":
@@ -209,7 +208,7 @@ export function createInteractiveHelp(): string {
   return [
     "Commands:",
     "  /help   Show this help",
-    "  /clear  Clear conversation state",
+    "  /new    Start a new conversation",
     "  /sessions  List saved sessions",
     "  /resume <id|latest>  Resume a saved session",
     "  /exit   Exit interactive mode",

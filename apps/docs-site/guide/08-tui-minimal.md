@@ -40,7 +40,7 @@ bun run kairos --resume latest
 ```text
 /sessions
 /resume latest
-/clear
+/new
 /exit
 ```
 

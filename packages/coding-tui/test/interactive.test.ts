@@ -50,7 +50,11 @@ describe("@kairos/coding-tui interactive mode", () => {
       input: "hello",
     });
     expect(parseCodingTuiInteractiveInput("/help")).toEqual({ type: "help" });
-    expect(parseCodingTuiInteractiveInput("/clear")).toEqual({ type: "clear" });
+    expect(parseCodingTuiInteractiveInput("/new")).toEqual({ type: "new" });
+    expect(parseCodingTuiInteractiveInput("/clear")).toEqual({
+      type: "unknown_command",
+      command: "/clear",
+    });
     expect(parseCodingTuiInteractiveInput("/quit")).toEqual({ type: "exit" });
     expect(parseCodingTuiInteractiveInput("/unknown arg")).toEqual({
       type: "unknown_command",
@@ -107,7 +111,7 @@ describe("@kairos/coding-tui interactive mode", () => {
     });
   });
 
-  test("clears the conversation with /clear", async () => {
+  test("starts a new conversation with /new without overwriting the previous session", async () => {
     const chunks: string[] = [];
     const requests: ModelRequest[] = [];
     const io: TuiIo = {
@@ -123,7 +127,7 @@ describe("@kairos/coding-tui interactive mode", () => {
       io,
       lineReader: createLineReader([
         "first question",
-        "/clear",
+        "/new",
         "fresh question",
         "/exit",
       ]),
@@ -134,9 +138,16 @@ describe("@kairos/coding-tui interactive mode", () => {
       ]),
     });
 
-    expect(chunks.join("")).toContain("session cleared");
+    expect(chunks.join("")).toContain("started new session");
     expect(requests[1]?.messages).toEqual([
       { role: "user", content: "fresh question" },
+    ]);
+
+    const summaries = await listCodingSessionRecords(join(root, ".kairos", "sessions"));
+    expect(summaries).toHaveLength(2);
+    expect(summaries.map((summary) => summary.firstUserMessage).sort()).toEqual([
+      "first question",
+      "fresh question",
     ]);
   });
 

@@ -130,7 +130,8 @@ describe("@kairos/coding-tui CLI args", () => {
     expect(createTuiCliHelp()).toContain("--record");
     expect(createTuiCliHelp()).toContain("--resume");
     expect(createTuiCliHelp()).toContain("Interactive commands");
-    expect(createTuiCliHelp()).toContain("/clear");
+    expect(createTuiCliHelp()).toContain("/new");
+    expect(createTuiCliHelp()).not.toContain("/clear");
     expect(createTuiCliHelp()).toContain("/sessions");
   });
 
