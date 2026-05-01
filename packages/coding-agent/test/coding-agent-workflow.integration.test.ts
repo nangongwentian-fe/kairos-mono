@@ -92,6 +92,9 @@ describe("@kairos/coding-agent workflow integration", () => {
         if (!lastCommandMessage) {
           throw new Error("Expected run_command result.");
         }
+        if (typeof lastCommandMessage.content !== "string") {
+          throw new Error("Expected run_command result content to be a string.");
+        }
         expect(JSON.parse(lastCommandMessage.content) as RunCommandResult)
           .toMatchObject({
             command: process.execPath,

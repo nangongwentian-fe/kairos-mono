@@ -10,8 +10,9 @@
 | --- | --- | --- |
 | `@kairos/ai` | `pi-mono`、`ai`、`typescript-sdk`、`openai-agents-js` | provider 抽象、流式协议、工具调用事件 |
 | `@kairos/agent` | `pi-mono`、`openai-agents-js`、`langgraphjs`、`deepagentsjs`、`opencode` | 运行循环、工具结果、停止条件 |
-| `@kairos/coding-agent` | `pi-mono`、`opencode`、`deepagentsjs`、`voltagent`、`mastra` | 文件工具、工作区边界、默认 prompt、任务状态 |
-| `@kairos/tui`、`@kairos/coding-tui` | `claude-code`、`codex`、`opencode`、`pi-mono` | 流式展示、工具事件、错误呈现、UI/产品分层 |
+| `@kairos/coding-agent` | `pi-mono`、`opencode`、`hermes-agent`、`deepagentsjs`、`voltagent`、`mastra` | 文件工具、工作区边界、默认提示词、任务状态、技能和记忆边界 |
+| `@kairos/tui`、`@kairos/coding-tui` | `claude-code`、`codex`、`opencode`、`hermes-agent`、`pi-mono` | 流式展示、工具事件、错误呈现、UI/产品分层、网关式 TUI |
+| 后续扩展能力 | `hermes-agent`、`mastra`、`voltagent`、`langgraphjs` | 技能、记忆、定时任务、跨平台消息入口、MCP、远程运行环境 |
 
 ## 取舍方式
 
@@ -21,6 +22,7 @@
 | 成熟项目有复杂权限模型 | 当前先做 coding-agent 内的最小策略 |
 | 成熟项目有任务状态提醒 | 当前纳入 Todo 提醒机制 |
 | 成熟项目有 Web UI | 当前先用 TUI 验证 Runtime |
+| Hermes 有技能、记忆、定时任务和跨平台消息入口 | 当前只作为设计参考，不默认加入这些重能力 |
 
 ## 学到什么
 

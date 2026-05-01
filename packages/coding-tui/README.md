@@ -2,13 +2,27 @@
 
 Terminal adapter and CLI for `@kairos/coding-agent`.
 
-Run a real OpenCode Go coding task from the repo root:
+Start an interactive coding session from the repo root:
+
+```bash
+bun run kairos
+```
+
+Start interactive mode with an initial prompt:
 
 ```bash
 bun run kairos "Read README.md and summarize it."
 ```
 
-Read the task from standard input:
+Interactive commands:
+
+```text
+/help   Show commands
+/clear  Clear conversation state
+/exit   Exit interactive mode
+```
+
+Read one task from standard input and keep the session open:
 
 ```bash
 echo "Read README.md and summarize it." | bun run kairos -
@@ -26,7 +40,7 @@ Print agent events as JSON lines:
 bun run kairos --json "Read README.md and summarize it."
 ```
 
-Write one explicit run record:
+Write one explicit one-shot run record:
 
 ```bash
 bun run kairos --record .kairos/runs/last.json "Read README.md and summarize it."
@@ -36,10 +50,10 @@ Run records may include file contents, command output, and tool arguments. The
 repo ignores `.kairos/` by default so local records are not committed by
 accident.
 
-Equivalent direct command:
+Equivalent direct interactive command:
 
 ```bash
-bun --env-file=.env.local packages/coding-tui/src/cli.ts "Read README.md and summarize it."
+bun --env-file=.env.local packages/coding-tui/src/cli.ts
 ```
 
 Use another model or workspace root:
@@ -68,7 +82,9 @@ console.log(run.result.stopReason);
 Current scope:
 
 - `packages/coding-tui/src/cli.ts` provides a minimal Bun CLI entry.
-- The CLI supports normal TUI output, `--print` final-text output, `--json` event output, `--record` explicit run records with workspace diff, and `-` for standard input.
+- The default CLI mode is interactive and keeps conversation state across turns.
+- `--print` final-text output, `--json` event output, and `--record` explicit run records stay one-shot for scripts.
+- `-` reads standard input as the initial interactive prompt.
 - `--json` emits stable versioned JSONL events through `@kairos/tui`.
 - `runCodingTuiTask()` calls `runCodingTask()` and renders live events as plain terminal text.
 - Normal TUI output includes a workspace change summary after the run. It records file status only, without full diff text.

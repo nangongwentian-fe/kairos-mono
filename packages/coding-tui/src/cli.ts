@@ -20,6 +20,7 @@ import {
   formatTuiJsonEvent,
   toTuiJsonEvents,
 } from "@kairos/tui";
+import { runCodingTuiInteractive } from "./interactive.js";
 import { runCodingTuiTask } from "./task.js";
 
 const DEFAULT_MODEL_ID = "kimi-k2.6";
@@ -143,7 +144,7 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
   }
 
   const input = await resolveTuiCliInput(parsed);
-  if (!input) {
+  if (!input && parsed.outputMode !== "tui") {
     stderr.write(`Missing task input.\n\n${createTuiCliHelp()}`);
     return 1;
   }
@@ -153,11 +154,26 @@ export async function runTuiCli(args: readonly string[] = argv.slice(2)): Promis
     let run: RunCodingTaskResult;
 
     if (parsed.outputMode === "tui") {
+      if (!parsed.recordPath) {
+        await runCodingTuiInteractive({
+          root: parsed.root,
+          model,
+          initialInput: input,
+          recordWorkspaceDiff: { includeDiff: false },
+        });
+        return 0;
+      }
+
+      if (!input) {
+        stderr.write(`Missing task input.\n\n${createTuiCliHelp()}`);
+        return 1;
+      }
+
       run = await runCodingTuiTask({
         root: parsed.root,
         model,
         input,
-        recordWorkspaceDiff: parsed.recordPath ? true : { includeDiff: false },
+        recordWorkspaceDiff: true,
       });
     } else {
       const jsonContext = createTuiJsonEventContext({
@@ -230,16 +246,22 @@ export function formatPrintOutput(run: RunCodingTaskResult): string {
 export function createTuiCliHelp(): string {
   return [
     "Usage:",
-    '  bun --env-file=.env.local packages/coding-tui/src/cli.ts [options] "task"',
+    "  bun --env-file=.env.local packages/coding-tui/src/cli.ts",
+    '  bun --env-file=.env.local packages/coding-tui/src/cli.ts "task"',
     "  echo \"task\" | bun --env-file=.env.local packages/coding-tui/src/cli.ts -",
     "",
     "Options:",
-    "  --print       Print only the final assistant text",
-    "  --json        Print agent events as JSON lines",
-    "  --record <path>  Write the full run record to a JSON file",
-    `  --model <id>  OpenCode Go model id. Default: ${DEFAULT_MODEL_ID}`,
-    "  --root <path>  Workspace root. Default: current directory",
-    "  -h, --help     Show this help message",
+    "  --print          Print only the final assistant text and exit",
+    "  --json           Print agent events as JSON lines and exit",
+    "  --record <path>  Write a one-shot run record to a JSON file",
+    `  --model <id>     OpenCode Go model id. Default: ${DEFAULT_MODEL_ID}`,
+    "  --root <path>    Workspace root. Default: current directory",
+    "  -h, --help       Show this help message",
+    "",
+    "Interactive commands:",
+    "  /help   Show commands",
+    "  /clear  Clear conversation state",
+    "  /exit   Exit interactive mode",
     "",
   ].join("\n");
 }

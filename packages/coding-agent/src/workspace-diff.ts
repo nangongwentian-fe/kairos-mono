@@ -88,13 +88,15 @@ export function createWorkspaceDiffReport(
 }
 
 export function createWorkspaceDirtyReminderMiddleware(
-  before: WorkspaceDiffResult,
+  before: WorkspaceDiffResult | (() => WorkspaceDiffResult | undefined),
 ): AgentMiddleware {
-  const reminder = formatWorkspaceDirtyReminder(before);
-
   return {
     name: "kairos.workspace-dirty-reminder",
     beforeModelRequest(request, context) {
+      const currentBefore = typeof before === "function" ? before() : before;
+      const reminder = currentBefore
+        ? formatWorkspaceDirtyReminder(currentBefore)
+        : undefined;
       if (!reminder || context.turn !== 1) {
         return;
       }
@@ -269,7 +271,7 @@ function toPosixPath(path: string): string {
   return path.replace(/\\/g, "/");
 }
 
-function formatWorkspaceDirtyReminder(
+export function formatWorkspaceDirtyReminder(
   before: WorkspaceDiffResult,
 ): string | undefined {
   if (before.status !== "dirty" || before.changedFiles.length === 0) {

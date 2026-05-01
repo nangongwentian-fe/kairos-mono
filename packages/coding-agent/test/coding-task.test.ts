@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type {
+  JsonObject,
   Model,
   ModelRequest,
   ModelResponse,
@@ -297,7 +298,7 @@ function createTextResponse(text: string): ModelResponse {
 function createToolCallResponse(
   id: string,
   name: string,
-  args: Record<string, unknown>,
+  args: JsonObject,
 ): ModelResponse {
   return {
     message: {

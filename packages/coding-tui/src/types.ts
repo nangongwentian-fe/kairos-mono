@@ -1,5 +1,7 @@
 import type { AgentEventListener } from "@kairos/agent";
 import type {
+  CodingSession,
+  CodingSessionOptions,
   RunCodingTaskOptions,
   RunCodingTaskResult,
 } from "@kairos/coding-agent";
@@ -15,3 +17,29 @@ export interface RunCodingTuiTaskResult extends RunCodingTaskResult {}
 
 export type RunTuiTaskOptions = RunCodingTuiTaskOptions;
 export type RunTuiTaskResult = RunCodingTuiTaskResult;
+
+export interface CodingTuiLineReader {
+  question: (prompt: string) => Promise<string | undefined>;
+  close?: () => Promise<void> | void;
+}
+
+export type CodingTuiInteractiveInput =
+  | { type: "empty" }
+  | { type: "input"; input: string }
+  | { type: "help" }
+  | { type: "clear" }
+  | { type: "exit" }
+  | { type: "unknown_command"; command: string };
+
+export type CodingTuiInteractiveCommand =
+  Exclude<CodingTuiInteractiveInput["type"], "input" | "empty">;
+
+export interface RunCodingTuiInteractiveOptions
+  extends CodingSessionOptions {
+  initialInput?: string;
+  io?: TuiIo;
+  lineReader?: CodingTuiLineReader;
+  onEvent?: AgentEventListener;
+  prompt?: string;
+  session?: CodingSession;
+}

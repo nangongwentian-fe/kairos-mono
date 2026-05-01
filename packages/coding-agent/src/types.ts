@@ -2,6 +2,7 @@ import type {
   AgentEventListener,
   AgentMiddleware,
   AgentRunResult,
+  AgentState,
   AgentStreamFunction,
   AgentTrace,
   AgentToolConfirmation,
@@ -221,11 +222,30 @@ export interface CodingAgentOptions {
   toolPolicy?: false | CodingToolPolicyOptions;
 }
 
-export interface RunCodingTaskOptions extends CodingAgentOptions {
-  input: string;
+export interface CodingSessionOptions extends CodingAgentOptions {
+  recordWorkspaceDiff?: boolean | WorkspaceDiffOptions;
+  workspaceGuard?: boolean | WorkspaceGuardOptions;
+}
+
+export interface CodingSessionRunOptions {
   onEvent?: AgentEventListener;
   recordWorkspaceDiff?: boolean | WorkspaceDiffOptions;
   workspaceGuard?: boolean | WorkspaceGuardOptions;
+}
+
+export interface CodingSession {
+  readonly state: AgentState;
+  subscribe: (listener: AgentEventListener) => () => void;
+  reset: (messages?: readonly Message[]) => void;
+  run: (
+    input: string,
+    options?: CodingSessionRunOptions,
+  ) => Promise<RunCodingTaskResult>;
+}
+
+export interface RunCodingTaskOptions extends CodingSessionOptions {
+  input: string;
+  onEvent?: AgentEventListener;
 }
 
 export interface RunCodingTaskResult {

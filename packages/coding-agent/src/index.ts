@@ -4,6 +4,7 @@ export {
   DEFAULT_CODING_AGENT_SYSTEM_PROMPT,
   createCodingAgent,
 } from "./agent.js";
+export { createCodingSession } from "./session.js";
 export {
   CODING_RUN_RECORD_VERSION,
   createCodingRunRecord,
@@ -27,6 +28,9 @@ export type {
   CodingAgentFileState,
   CodingAgentOptions,
   CodingPermissionMiddlewareOptions,
+  CodingSession,
+  CodingSessionOptions,
+  CodingSessionRunOptions,
   CodingToolPolicyOptions,
   CollectWorkspaceDiffOptions,
   EditFileResult,

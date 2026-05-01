@@ -31,3 +31,9 @@ bun run test:web-ui
 bun run test:deps
 bun run docs:dev
 ```
+
+Run the interactive coding CLI:
+
+```bash
+bun run kairos
+```

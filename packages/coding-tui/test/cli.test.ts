@@ -106,12 +106,17 @@ describe("@kairos/coding-tui CLI args", () => {
 
   test("prints the executable bun command in help", () => {
     expect(createTuiCliHelp()).toContain(
-      'bun --env-file=.env.local packages/coding-tui/src/cli.ts [options] "task"',
+      "bun --env-file=.env.local packages/coding-tui/src/cli.ts",
+    );
+    expect(createTuiCliHelp()).toContain(
+      'bun --env-file=.env.local packages/coding-tui/src/cli.ts "task"',
     );
     expect(createTuiCliHelp()).toContain("echo \"task\"");
     expect(createTuiCliHelp()).toContain("--print");
     expect(createTuiCliHelp()).toContain("--json");
     expect(createTuiCliHelp()).toContain("--record");
+    expect(createTuiCliHelp()).toContain("Interactive commands");
+    expect(createTuiCliHelp()).toContain("/clear");
   });
 
   test("combines piped stdin with optional prompt text", async () => {

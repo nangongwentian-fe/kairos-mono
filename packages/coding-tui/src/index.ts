@@ -14,8 +14,18 @@ export {
   type TuiCliArgs,
   type TuiCliOutputMode,
 } from "./cli.js";
+export {
+  createInteractiveHelp,
+  createInteractiveWelcome,
+  parseCodingTuiInteractiveInput,
+  runCodingTuiInteractive,
+} from "./interactive.js";
 export { formatWorkspaceSummary } from "./workspace-summary.js";
 export type {
+  CodingTuiInteractiveCommand,
+  CodingTuiInteractiveInput,
+  CodingTuiLineReader,
+  RunCodingTuiInteractiveOptions,
   RunCodingTuiTaskOptions,
   RunCodingTuiTaskResult,
   RunTuiTaskOptions,

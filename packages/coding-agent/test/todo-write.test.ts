@@ -108,11 +108,11 @@ describe("@kairos/coding-agent todo_write tool", () => {
     await expect(
       tool.execute({
         todos: [
-          {
-            id: "bad",
-            content: "Bad status",
-            status: "blocked",
-          },
+            {
+              id: "bad",
+              content: "Bad status",
+              status: "blocked" as never,
+            },
         ],
       }),
     ).rejects.toThrow(
