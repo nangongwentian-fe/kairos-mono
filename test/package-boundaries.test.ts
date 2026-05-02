@@ -11,6 +11,7 @@ interface PackageInfo {
 
 const ROOT_DIR = path.resolve(import.meta.dir, "..");
 const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
+const APPS_DIR = path.join(ROOT_DIR, "apps");
 
 const ALLOWED_INTERNAL_DEPENDENCIES = new Map<string, readonly string[]>([
   ["@kairos/ai", []],
@@ -22,6 +23,8 @@ const ALLOWED_INTERNAL_DEPENDENCIES = new Map<string, readonly string[]>([
   ],
   ["@kairos/tui", ["@kairos/ai", "@kairos/agent"]],
   ["@kairos/web-ui", ["@kairos/ai", "@kairos/agent"]],
+  ["@kairos/coding-web", ["@kairos/ai", "@kairos/coding-agent", "@kairos/web-ui"]],
+  ["@kairos/docs-site", []],
 ]);
 
 describe("package dependency boundaries", () => {
@@ -65,7 +68,17 @@ describe("package dependency boundaries", () => {
 });
 
 async function readPackageInfos(): Promise<PackageInfo[]> {
-  const entries = await readdir(PACKAGES_DIR, { withFileTypes: true });
+  const packages: PackageInfo[] = [];
+
+  for (const workspaceDir of [PACKAGES_DIR, APPS_DIR]) {
+    packages.push(...(await readPackageInfosFromDir(workspaceDir)));
+  }
+
+  return packages.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function readPackageInfosFromDir(workspaceDir: string): Promise<PackageInfo[]> {
+  const entries = await readdir(workspaceDir, { withFileTypes: true });
   const packages: PackageInfo[] = [];
 
   for (const entry of entries) {
@@ -73,7 +86,7 @@ async function readPackageInfos(): Promise<PackageInfo[]> {
       continue;
     }
 
-    const dir = path.join(PACKAGES_DIR, entry.name);
+    const dir = path.join(workspaceDir, entry.name);
     const packageJsonPath = path.join(dir, "package.json");
     if (!(await exists(packageJsonPath))) {
       continue;
@@ -103,7 +116,7 @@ async function readPackageInfos(): Promise<PackageInfo[]> {
     });
   }
 
-  return packages.sort((a, b) => a.name.localeCompare(b.name));
+  return packages;
 }
 
 function readInternalDependencyNames(

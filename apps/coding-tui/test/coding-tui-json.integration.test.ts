@@ -65,7 +65,7 @@ function runCliProcess(args: readonly string[]): Promise<{
 }> {
   return new Promise((resolveProcess, reject) => {
     const root = repoRoot();
-    const child = spawn(process.execPath, [join(root, "packages/coding-tui/src/cli.ts"), ...args], {
+    const child = spawn(process.execPath, [join(root, "apps/coding-tui/src/cli.ts"), ...args], {
       cwd: root,
       env: process.env,
       shell: false,

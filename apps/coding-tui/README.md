@@ -61,7 +61,7 @@ accident.
 Equivalent direct interactive command:
 
 ```bash
-bun --env-file=.env.local packages/coding-tui/src/cli.ts
+bun --env-file=.env.local apps/coding-tui/src/cli.ts
 ```
 
 Use another model or workspace root:
@@ -89,7 +89,7 @@ console.log(run.result.stopReason);
 
 Current scope:
 
-- `packages/coding-tui/src/cli.ts` provides a minimal Bun CLI entry.
+- `apps/coding-tui/src/cli.ts` provides a minimal Bun CLI entry.
 - The default CLI mode is interactive and keeps conversation state across turns.
 - Interactive sessions are stored under `.kairos/sessions/` and ignored by git.
 - `/new` starts a new conversation without overwriting the previous session.

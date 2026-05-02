@@ -12,6 +12,7 @@ bun install
 bun run test:agent
 bun run test:coding-agent
 bun run test:coding-tui
+bun run test:coding-web
 bun run test:tui
 bun run test:web-ui
 bun run test:deps
@@ -56,4 +57,10 @@ bun run kairos --json "读取 README 并总结项目结构"
 bun run docs:dev
 bun run docs:build
 bun run docs:preview
+```
+
+## Web UI
+
+```bash
+bun run coding-web:dev
 ```

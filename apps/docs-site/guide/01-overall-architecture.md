@@ -10,6 +10,9 @@
 apps/docs-site
   教程文档
 
+apps/coding-web
+  本地浏览器界面，组合 coding-agent 和 web-ui
+
 packages/ai
   模型定义、provider 查询、流式协议、OpenAI 兼容传输
 
@@ -22,7 +25,7 @@ packages/coding-agent
 packages/tui
   通用终端 IO、Agent 事件展示、JSONL 事件协议
 
-packages/coding-tui
+apps/coding-tui
   组合 coding-agent 和 tui，提供 Kairos coding CLI
 
 packages/web-ui
@@ -40,6 +43,7 @@ packages/web-ui
 | `@kairos/coding-tui` | `@kairos/coding-agent`、`@kairos/tui` | 文档站点 |
 | `@kairos/web-ui` | `@kairos/agent`、`@kairos/ai` | `coding-agent` |
 | `@kairos/docs-site` | VitePress | 运行时代码 |
+| `@kairos/coding-web` | `@kairos/coding-agent`、`@kairos/web-ui` | 模型密钥放到浏览器 |
 
 ## 关键判断
 

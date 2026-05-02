@@ -15,7 +15,7 @@
       "path": "./packages/coding-agent"
     },
     {
-      "path": "./packages/coding-tui"
+      "path": "./apps/coding-tui"
     },
     {
       "path": "./packages/web-ui"

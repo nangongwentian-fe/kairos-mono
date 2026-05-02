@@ -283,9 +283,9 @@ export function formatPrintOutput(run: RunCodingTaskResult): string {
 export function createTuiCliHelp(): string {
   return [
     "Usage:",
-    "  bun --env-file=.env.local packages/coding-tui/src/cli.ts",
-    '  bun --env-file=.env.local packages/coding-tui/src/cli.ts "task"',
-    "  echo \"task\" | bun --env-file=.env.local packages/coding-tui/src/cli.ts -",
+    "  bun --env-file=.env.local apps/coding-tui/src/cli.ts",
+    '  bun --env-file=.env.local apps/coding-tui/src/cli.ts "task"',
+    "  echo \"task\" | bun --env-file=.env.local apps/coding-tui/src/cli.ts -",
     "",
     "Options:",
     "  --print          Print only the final assistant text and exit",

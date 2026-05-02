@@ -12,6 +12,7 @@ without pulling higher-level assumptions into lower-level code.
 
 @kairos/web-ui -> @kairos/agent, @kairos/ai
 @kairos/tui    -> @kairos/agent, @kairos/ai
+@kairos/coding-web -> @kairos/coding-agent, @kairos/web-ui, @kairos/ai
 @kairos/coding-tui -> @kairos/coding-agent, @kairos/tui, @kairos/agent, @kairos/ai
 ```
 
@@ -22,7 +23,8 @@ without pulling higher-level assumptions into lower-level code.
 - `@kairos/coding-agent`: coding-specific tools, prompts, task helpers, workspace guardrails.
 - `@kairos/web-ui`: framework-agnostic Web UI state and future reusable Web components.
 - `@kairos/tui`: generic terminal IO, event rendering, JSON event mapping, and formatting helpers.
-- `@kairos/coding-tui`: terminal adapter and CLI for `@kairos/coding-agent`.
+- `@kairos/coding-web`: local browser app that composes `@kairos/coding-agent` and `@kairos/web-ui`.
+- `@kairos/coding-tui`: local terminal app that composes `@kairos/coding-agent` and `@kairos/tui`.
 
 ## Reference-Informed Target
 
@@ -37,6 +39,7 @@ grows:
 
 @kairos/tui        // generic terminal primitives and render helpers
 @kairos/web-ui     // generic Web state/components
+@kairos/coding-web // composes coding-agent + web-ui
 @kairos/coding-tui // composes coding-agent + tui
 ```
 

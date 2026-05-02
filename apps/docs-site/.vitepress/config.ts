@@ -37,6 +37,7 @@ export default defineConfig({
             { text: "10. Middleware", link: "/guide/10-middleware" },
             { text: "11. Tool Policy", link: "/guide/11-tool-policy" },
             { text: "12. Workspace Diff", link: "/guide/12-workspace-diff" },
+            { text: "13. Coding Web", link: "/guide/13-coding-web" },
           ],
         },
       ],

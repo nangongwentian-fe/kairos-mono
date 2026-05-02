@@ -1,0 +1,17 @@
+{
+  "name": "@kairos/coding-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env.local src/server.ts",
+    "build": "echo \"@kairos/coding-web build placeholder\"",
+    "test": "bun test test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "echo \"@kairos/coding-web clean placeholder\""
+  },
+  "dependencies": {
+    "@kairos/ai": "workspace:*",
+    "@kairos/coding-agent": "workspace:*",
+    "@kairos/web-ui": "workspace:*"
+  }
+}
