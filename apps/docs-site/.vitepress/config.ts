@@ -45,7 +45,7 @@ export default defineConfig({
         {
           text: "设计记录",
           items: [
-            { text: "Package 边界", link: "/design/package-boundaries" },
+            { text: "包与应用边界", link: "/design/package-boundaries" },
             { text: "Reference 项目怎么用", link: "/design/reference-projects" },
             { text: "为什么不先做 FakeModel", link: "/design/why-not-fakemodel" },
             { text: "为什么是 grep 工具", link: "/design/why-grep-not-search-text" },

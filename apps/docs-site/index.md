@@ -17,7 +17,7 @@ features:
   - title: 真实模型优先
     details: 第一层先接 OpenCode Go，避免只在假数据上理解 Agent。
   - title: 分层学习
-    details: ai、agent、coding-agent、tui 各做一件事，边界清楚，后续好扩展。
+    details: packages 负责可复用库，apps 负责真实运行入口，边界清楚，后续好扩展。
   - title: 安全工具
     details: 读文件、搜索、编辑、运行命令都从最小可控版本开始。
   - title: 参考真实项目
@@ -32,6 +32,6 @@ features:
 
 | 目标 | 入口 |
 | --- | --- |
-| 看分层设计 | [Package 边界](/design/package-boundaries) |
+| 看项目架构和分层设计 | [包与应用边界](/design/package-boundaries) |
 | 看实现顺序 | [实现时间线](/appendix/timeline) |
 | 看开发命令 | [常用命令](/appendix/commands) |
