@@ -59,6 +59,39 @@
 
         <section id="transcript" class="transcript" aria-live="polite"></section>
 
+        <section
+          id="approval-panel"
+          class="approval-panel"
+          aria-label="Tool approval"
+          hidden
+        >
+          <div class="approval-header">
+            <div>
+              <p class="eyebrow">Permission required</p>
+              <h3 id="approval-name">Tool request</h3>
+            </div>
+            <span id="approval-risk" class="approval-risk">write</span>
+          </div>
+          <div class="approval-grid">
+            <div>
+              <p class="approval-label">Arguments</p>
+              <pre id="approval-args" class="approval-code"></pre>
+            </div>
+            <div>
+              <p class="approval-label">Preview</p>
+              <pre id="approval-preview" class="approval-code"></pre>
+            </div>
+          </div>
+          <div class="approval-actions">
+            <button id="approval-deny" type="button" class="button secondary">
+              Deny
+            </button>
+            <button id="approval-allow" type="button" class="button primary">
+              Allow once
+            </button>
+          </div>
+        </section>
+
         <form id="prompt-form" class="prompt-box">
           <textarea
             id="prompt-input"

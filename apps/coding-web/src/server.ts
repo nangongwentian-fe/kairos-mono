@@ -3,12 +3,14 @@ import { requireModel } from "@kairos/ai";
 import {
   createCodingSession,
   type CodingSession,
+  type CodingSessionOptions,
 } from "@kairos/coding-agent";
 import {
   createWebUiEventStore,
   type WebUiEventStore,
   type WebUiState,
 } from "@kairos/web-ui";
+import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { env } from "node:process";
 import { fileURLToPath } from "node:url";
@@ -19,6 +21,8 @@ const DEFAULT_PROVIDER = "opencode-go";
 const DEFAULT_MODEL_ID = "kimi-k2.6";
 const MAX_INPUT_LENGTH = 12000;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
+const APPROVAL_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
+const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const PUBLIC_DIR = join(APP_DIR, "public");
@@ -27,6 +31,22 @@ const DEFAULT_ROOT = resolve(APP_DIR, "../..");
 export interface CodingWebRunRequest {
   input: string;
   sessionId: string;
+}
+
+export interface CodingWebApprovalDecisionRequest {
+  sessionId: string;
+  approvalId: string;
+  decision: "allow" | "deny";
+}
+
+export interface CodingWebApprovalRequest {
+  id: string;
+  sessionId: string;
+  toolCallId: string;
+  toolName: string;
+  risk: string;
+  arguments: unknown;
+  preview?: string;
 }
 
 export interface CodingWebServerOptions {
@@ -40,10 +60,90 @@ export interface CodingWebServerOptions {
 interface CodingWebSessionRecord {
   session: CodingSession;
   store: WebUiEventStore;
+  approvals: CodingWebApprovalBroker;
 }
 
 export class BadRequestError extends Error {
   readonly status = 400;
+}
+
+type CodingToolConfirmation = NonNullable<
+  CodingSessionOptions["confirmToolCall"]
+>;
+type CodingToolConfirmationArgs = Parameters<CodingToolConfirmation>;
+
+interface PendingApproval {
+  sessionId: string;
+  resolve: (allowed: boolean) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
+
+export class CodingWebApprovalBroker {
+  private readonly pending = new Map<string, PendingApproval>();
+  private emit?: (approval: CodingWebApprovalRequest) => void;
+
+  setEmitter(emit: ((approval: CodingWebApprovalRequest) => void) | undefined): void {
+    this.emit = emit;
+  }
+
+  request(
+    sessionId: string,
+    toolCall: CodingToolConfirmationArgs[0],
+    tool: CodingToolConfirmationArgs[1],
+    preview: CodingToolConfirmationArgs[2],
+  ): Promise<boolean> {
+    if (!this.emit) {
+      return Promise.resolve(false);
+    }
+
+    const approval: CodingWebApprovalRequest = {
+      id: randomUUID(),
+      sessionId,
+      toolCallId: toolCall.id,
+      toolName: tool.name,
+      risk: tool.risk ?? "read",
+      arguments: toolCall.arguments,
+      preview,
+    };
+
+    return new Promise<boolean>((resolveApproval) => {
+      const timeout = setTimeout(() => {
+        this.resolve(approval.sessionId, approval.id, false);
+      }, APPROVAL_TIMEOUT_MS);
+
+      this.pending.set(approval.id, {
+        sessionId: approval.sessionId,
+        resolve: resolveApproval,
+        timeout,
+      });
+
+      try {
+        this.emit?.(approval);
+      } catch {
+        this.resolve(approval.sessionId, approval.id, false);
+      }
+    });
+  }
+
+  resolve(sessionId: string, approvalId: string, allowed: boolean): boolean {
+    const pending = this.pending.get(approvalId);
+    if (!pending || pending.sessionId !== sessionId) {
+      return false;
+    }
+
+    clearTimeout(pending.timeout);
+    this.pending.delete(approvalId);
+    pending.resolve(allowed);
+    return true;
+  }
+
+  cancelAll(): void {
+    for (const [approvalId, pending] of this.pending) {
+      clearTimeout(pending.timeout);
+      this.pending.delete(approvalId);
+      pending.resolve(false);
+    }
+  }
 }
 
 export class CodingWebRunService {
@@ -57,6 +157,7 @@ export class CodingWebRunService {
 
   reset(sessionId: string): WebUiState {
     const record = this.getOrCreateSession(sessionId);
+    record.approvals.cancelAll();
     record.session.reset();
     return record.store.reset();
   }
@@ -70,6 +171,9 @@ export class CodingWebRunService {
         const send = (event: string, data: unknown) => {
           controller.enqueue(encoder.encode(formatSseEvent(event, data)));
         };
+        record.approvals.setEmitter((approval) => {
+          send("approval", approval);
+        });
         const unsubscribe = record.session.subscribe((event) => {
           send("state", record.store.dispatch(event));
         });
@@ -87,11 +191,27 @@ export class CodingWebRunService {
             state,
           });
         } finally {
+          record.approvals.setEmitter(undefined);
           unsubscribe();
           controller.close();
         }
       },
+      cancel: () => {
+        record.approvals.cancelAll();
+      },
     });
+  }
+
+  resolveApproval(request: CodingWebApprovalDecisionRequest): void {
+    const record = this.sessions.get(request.sessionId);
+    const resolved = record?.approvals.resolve(
+      request.sessionId,
+      request.approvalId,
+      request.decision === "allow",
+    );
+    if (!resolved) {
+      throw new BadRequestError("approval not found.");
+    }
   }
 
   private getOrCreateSession(sessionId: string): CodingWebSessionRecord {
@@ -101,14 +221,17 @@ export class CodingWebRunService {
     }
 
     const model = requireModel(this.provider, this.modelId);
+    const approvals = new CodingWebApprovalBroker();
     const record: CodingWebSessionRecord = {
       session: createCodingSession({
         root: this.root,
         model,
         recordWorkspaceDiff: { includeDiff: false },
-        confirmToolCall: () => false,
+        confirmToolCall: (toolCall, tool, preview) =>
+          approvals.request(sessionId, toolCall, tool, preview),
       }),
       store: createWebUiEventStore(),
+      approvals,
     };
     this.sessions.set(sessionId, record);
     return record;
@@ -141,6 +264,37 @@ export async function parseRunRequest(request: Request): Promise<CodingWebRunReq
   }
 
   return { input, sessionId };
+}
+
+export async function parseApprovalDecisionRequest(
+  request: Request,
+): Promise<CodingWebApprovalDecisionRequest> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new BadRequestError("Request body must be JSON.");
+  }
+
+  if (!isRecord(body)) {
+    throw new BadRequestError("Request body must be an object.");
+  }
+
+  const sessionId = readString(body.sessionId, "sessionId").trim();
+  const approvalId = readString(body.approvalId, "approvalId").trim();
+  const decision = readString(body.decision, "decision").trim();
+
+  if (!SESSION_ID_PATTERN.test(sessionId)) {
+    throw new BadRequestError("sessionId is invalid.");
+  }
+  if (!APPROVAL_ID_PATTERN.test(approvalId)) {
+    throw new BadRequestError("approvalId is invalid.");
+  }
+  if (decision !== "allow" && decision !== "deny") {
+    throw new BadRequestError("decision must be allow or deny.");
+  }
+
+  return { sessionId, approvalId, decision };
 }
 
 export function formatSseEvent(event: string, data: unknown): string {
@@ -196,6 +350,11 @@ async function handleRequest(
           "Content-Type": "text/event-stream; charset=utf-8",
         },
       });
+    }
+    if (request.method === "POST" && url.pathname === "/api/approval") {
+      const approvalRequest = await parseApprovalDecisionRequest(request);
+      service.resolveApproval(approvalRequest);
+      return jsonResponse({ ok: true });
     }
   } catch (error) {
     return errorResponse(error);

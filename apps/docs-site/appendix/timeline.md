@@ -61,3 +61,4 @@
 56. 决定文档应用放在 `apps/docs-site`。
 57. 新增本教程站点，开始记录从 0 到现在的实现过程。
 58. 新增 `apps/coding-web`，把 `@kairos/web-ui` 状态层接到真实 coding-agent 事件流。
+59. 为 `apps/coding-web` 增加浏览器工具确认，让写文件和运行命令能在用户允许后继续执行。

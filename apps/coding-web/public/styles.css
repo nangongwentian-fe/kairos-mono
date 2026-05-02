@@ -377,6 +377,86 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.approval-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0 28px 18px;
+  padding: 14px;
+  border: 1px solid var(--warn);
+  background: #fff7e8;
+  box-shadow: var(--shadow);
+}
+
+.approval-panel[hidden] {
+  display: none;
+}
+
+.approval-header,
+.approval-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approval-header h3,
+.approval-label {
+  margin: 0;
+  font-family: ui-sans-serif, Avenir Next, Helvetica, sans-serif;
+}
+
+.approval-header h3 {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.approval-risk {
+  min-width: 88px;
+  padding: 6px 10px;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  font-family: ui-sans-serif, Avenir Next, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.approval-risk[data-risk="execute"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.approval-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.approval-label {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.approval-code {
+  max-height: 220px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: rgba(255, 253, 247, 0.74);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval-actions {
+  justify-content: flex-end;
+}
+
 .prompt-box {
   display: grid;
   gap: 12px;
@@ -438,15 +518,27 @@ textarea {
   .side-panel,
   .topbar,
   .transcript,
+  .approval-panel,
   .prompt-box {
     padding-left: 16px;
     padding-right: 16px;
   }
 
+  .approval-panel {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
   .topbar,
+  .approval-header,
+  .approval-actions,
   .prompt-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .approval-grid {
+    grid-template-columns: 1fr;
   }
 
   .button {

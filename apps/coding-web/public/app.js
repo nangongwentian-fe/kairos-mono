@@ -13,10 +13,19 @@ const stateEls = {
   todos: document.querySelector("#todo-list"),
   todoCounts: document.querySelector("#todo-counts"),
   transcript: document.querySelector("#transcript"),
+  approvalPanel: document.querySelector("#approval-panel"),
+  approvalName: document.querySelector("#approval-name"),
+  approvalRisk: document.querySelector("#approval-risk"),
+  approvalArgs: document.querySelector("#approval-args"),
+  approvalPreview: document.querySelector("#approval-preview"),
+  approvalAllow: document.querySelector("#approval-allow"),
+  approvalDeny: document.querySelector("#approval-deny"),
 };
 
 const sessionId = getSessionId();
 let busy = false;
+let approvalBusy = false;
+let currentApproval;
 
 stateEls.form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -52,11 +61,20 @@ stateEls.resetButton.addEventListener("click", async () => {
     }
     renderState(body.state);
     stateEls.input.value = "";
+    clearApproval();
   } catch (error) {
     setNotice(formatError(error));
   } finally {
     setBusy(false);
   }
+});
+
+stateEls.approvalAllow.addEventListener("click", () => {
+  respondToApproval("allow");
+});
+
+stateEls.approvalDeny.addEventListener("click", () => {
+  respondToApproval("deny");
 });
 
 renderState({
@@ -69,6 +87,7 @@ renderState({
 async function runPrompt(input) {
   setBusy(true);
   setNotice("");
+  clearApproval();
 
   try {
     const response = await fetch("/api/run", {
@@ -87,12 +106,18 @@ async function runPrompt(input) {
         renderState(event.data);
         return;
       }
+      if (event.type === "approval") {
+        renderApproval(event.data);
+        return;
+      }
       if (event.type === "done") {
         renderState(event.data.state);
+        clearApproval();
         return;
       }
       if (event.type === "error") {
         renderState(event.data.state);
+        clearApproval();
         setNotice(event.data.message);
       }
     });
@@ -101,6 +126,59 @@ async function runPrompt(input) {
   } finally {
     setBusy(false);
   }
+}
+
+async function respondToApproval(decision) {
+  if (!currentApproval || approvalBusy) {
+    return;
+  }
+
+  const approval = currentApproval;
+  setApprovalBusy(true);
+  try {
+    const response = await fetch("/api/approval", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        approvalId: approval.id,
+        decision,
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.error || "Approval failed.");
+    }
+    if (currentApproval?.id === approval.id) {
+      clearApproval();
+    }
+    setNotice(decision === "allow" ? "Tool approved." : "Tool denied.");
+  } catch (error) {
+    setNotice(formatError(error));
+    setApprovalBusy(false);
+  }
+}
+
+function renderApproval(approval) {
+  currentApproval = approval;
+  stateEls.approvalName.textContent = approval.toolName;
+  stateEls.approvalRisk.textContent = approval.risk;
+  stateEls.approvalRisk.dataset.risk = approval.risk;
+  stateEls.approvalArgs.textContent = JSON.stringify(approval.arguments, null, 2);
+  stateEls.approvalPreview.textContent = approval.preview || "(no preview)";
+  stateEls.approvalPanel.hidden = false;
+  setApprovalBusy(false);
+}
+
+function clearApproval() {
+  currentApproval = undefined;
+  stateEls.approvalPanel.hidden = true;
+  stateEls.approvalName.textContent = "Tool request";
+  stateEls.approvalRisk.textContent = "";
+  stateEls.approvalRisk.dataset.risk = "";
+  stateEls.approvalArgs.textContent = "";
+  stateEls.approvalPreview.textContent = "";
+  setApprovalBusy(false);
 }
 
 async function readSse(stream, onEvent) {
@@ -260,6 +338,13 @@ function setBusy(nextBusy) {
   stateEls.runButton.disabled = nextBusy;
   stateEls.resetButton.disabled = nextBusy;
   stateEls.runButton.textContent = nextBusy ? "Running" : "Run";
+}
+
+function setApprovalBusy(nextBusy) {
+  approvalBusy = nextBusy;
+  stateEls.approvalAllow.disabled = nextBusy;
+  stateEls.approvalDeny.disabled = nextBusy;
+  stateEls.approvalAllow.textContent = nextBusy ? "Sending" : "Allow once";
 }
 
 function setNotice(message) {
