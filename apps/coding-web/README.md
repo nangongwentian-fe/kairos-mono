@@ -1,6 +1,10 @@
 # @kairos/coding-web
 
-Minimal browser UI for `@kairos/coding-agent`.
+Local browser UI for `@kairos/coding-agent`.
+
+It is a runnable app, not a reusable package. The browser app lives here; shared Web state and event helpers stay in `@kairos/web-ui`.
+
+## Run
 
 Run from the repo root:
 
@@ -14,12 +18,51 @@ Open:
 http://127.0.0.1:4174
 ```
 
-Current scope:
+## Current Scope
 
-- The Bun server keeps the model key on the server.
+- The client is a React + Vite app.
+- The Bun server serves the built client from `dist/client`.
+- The Bun server keeps model keys on the server.
 - Browser requests stream `@kairos/web-ui` state updates over server-sent events.
-- The UI renders user messages, assistant text, tool calls, and `todo_write`.
-- Sessions are in memory and keyed by the browser session id.
+- The UI renders user messages, assistant text, tool calls, approvals, and `todo_write`.
+- Sessions are listed in the sidebar. `New` starts a fresh browser session.
+- Session metadata is stored in browser `localStorage`; live session state stays in server memory.
+- Switching sessions loads the current server-side state for that session id.
 - Write and execute tools pause for browser approval before they run.
 - Approval is per tool call. The browser can allow once or deny.
 - The server still applies the coding-agent tool policy before approval, so protected paths and blocked commands do not reach the browser prompt.
+
+## Client Layout
+
+```text
+src/client
+  App.tsx
+    React app shell, session list, message list, prompt form
+
+  components/ai-elements
+    AI Elements components installed into this app
+
+  components/ui
+    shadcn/ui primitives used by the app
+
+  main.tsx
+    React entry
+
+  styles.css
+    Tailwind CSS and app-level response styles
+```
+
+## Server API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Health check. |
+| `GET /api/session?sessionId=...` | Read the current in-memory Web UI state for a session. |
+| `POST /api/run` | Start one agent turn and stream state updates over server-sent events. |
+| `POST /api/approval` | Resolve one pending browser approval. |
+
+## Notes
+
+- `@kairos/web-ui` owns protocol and state helpers.
+- `apps/coding-web` owns React components, routing-free app layout, and browser-specific behavior.
+- Server restarts clear live session state. Browser session metadata remains, so an old session may reopen as an empty state after restart.

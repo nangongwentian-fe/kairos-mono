@@ -29,7 +29,7 @@ apps/coding-tui
   组合 coding-agent 和 tui，提供本地终端 Coding Agent
 
 apps/coding-web
-  组合 coding-agent 和 web-ui，提供本地浏览器 Coding Agent
+  组合 coding-agent 和 web-ui，提供 React/Vite 本地浏览器 Coding Agent
 
 apps/docs-site
   VitePress 教程和设计文档
@@ -61,7 +61,7 @@ agent -> web-ui
 
 - `apps/docs-site`: VitePress 教程站点，记录 Kairos 的实现过程和设计判断。
 - `apps/coding-tui`: 本地终端界面，运行 `@kairos/coding-agent`。
-- `apps/coding-web`: 本地浏览器界面，运行 `@kairos/coding-agent`。
+- `apps/coding-web`: React/Vite 本地浏览器界面，运行 `@kairos/coding-agent`。
 
 ## 构建方向
 

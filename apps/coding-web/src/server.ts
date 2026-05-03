@@ -6,12 +6,13 @@ import {
   type CodingSessionOptions,
 } from "@kairos/coding-agent";
 import {
+  createInitialWebUiState,
   createWebUiEventStore,
   type WebUiEventStore,
   type WebUiState,
 } from "@kairos/web-ui";
 import { randomUUID } from "node:crypto";
-import { join, resolve } from "node:path";
+import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { env } from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -25,7 +26,7 @@ const APPROVAL_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
-const PUBLIC_DIR = join(APP_DIR, "public");
+const CLIENT_DIST_DIR = join(APP_DIR, "dist/client");
 const DEFAULT_ROOT = resolve(APP_DIR, "../..");
 
 export interface CodingWebRunRequest {
@@ -155,11 +156,8 @@ export class CodingWebRunService {
     private readonly modelId: string,
   ) {}
 
-  reset(sessionId: string): WebUiState {
-    const record = this.getOrCreateSession(sessionId);
-    record.approvals.cancelAll();
-    record.session.reset();
-    return record.store.reset();
+  getState(sessionId: string): WebUiState {
+    return this.sessions.get(sessionId)?.store.getState() ?? createInitialWebUiState();
   }
 
   run(request: CodingWebRunRequest): ReadableStream<Uint8Array> {
@@ -259,11 +257,7 @@ export async function parseRunRequest(request: Request): Promise<CodingWebRunReq
   if (input.length > MAX_INPUT_LENGTH) {
     throw new BadRequestError(`input must be at most ${MAX_INPUT_LENGTH} characters.`);
   }
-  if (!SESSION_ID_PATTERN.test(sessionId)) {
-    throw new BadRequestError("sessionId is invalid.");
-  }
-
-  return { input, sessionId };
+  return { input, sessionId: parseSessionId(sessionId) };
 }
 
 export async function parseApprovalDecisionRequest(
@@ -280,13 +274,10 @@ export async function parseApprovalDecisionRequest(
     throw new BadRequestError("Request body must be an object.");
   }
 
-  const sessionId = readString(body.sessionId, "sessionId").trim();
+  const sessionId = parseSessionId(readString(body.sessionId, "sessionId"));
   const approvalId = readString(body.approvalId, "approvalId").trim();
   const decision = readString(body.decision, "decision").trim();
 
-  if (!SESSION_ID_PATTERN.test(sessionId)) {
-    throw new BadRequestError("sessionId is invalid.");
-  }
   if (!APPROVAL_ID_PATTERN.test(approvalId)) {
     throw new BadRequestError("approvalId is invalid.");
   }
@@ -325,21 +316,12 @@ async function handleRequest(
   const url = new URL(request.url);
 
   try {
-    if (request.method === "GET" && url.pathname === "/") {
-      return servePublicFile("index.html", "text/html; charset=utf-8");
-    }
-    if (request.method === "GET" && url.pathname === "/app.js") {
-      return servePublicFile("app.js", "text/javascript; charset=utf-8");
-    }
-    if (request.method === "GET" && url.pathname === "/styles.css") {
-      return servePublicFile("styles.css", "text/css; charset=utf-8");
-    }
     if (request.method === "GET" && url.pathname === "/api/health") {
       return jsonResponse({ ok: true });
     }
-    if (request.method === "POST" && url.pathname === "/api/reset") {
-      const { sessionId } = await parseSessionRequest(request);
-      return jsonResponse({ state: service.reset(sessionId) });
+    if (request.method === "GET" && url.pathname === "/api/session") {
+      const sessionId = parseSessionId(url.searchParams.get("sessionId") ?? "");
+      return jsonResponse({ state: service.getState(sessionId) });
     }
     if (request.method === "POST" && url.pathname === "/api/run") {
       const runRequest = await parseRunRequest(request);
@@ -356,6 +338,12 @@ async function handleRequest(
       service.resolveApproval(approvalRequest);
       return jsonResponse({ ok: true });
     }
+    if (request.method === "GET") {
+      const staticResponse = await serveClientFile(url.pathname);
+      if (staticResponse) {
+        return staticResponse;
+      }
+    }
   } catch (error) {
     return errorResponse(error);
   }
@@ -363,33 +351,61 @@ async function handleRequest(
   return new Response("Not found.", { status: 404 });
 }
 
-async function parseSessionRequest(
-  request: Request,
-): Promise<{ sessionId: string }> {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    throw new BadRequestError("Request body must be JSON.");
-  }
-  if (!isRecord(body)) {
-    throw new BadRequestError("Request body must be an object.");
-  }
-
-  const sessionId = readString(body.sessionId, "sessionId").trim();
+function parseSessionId(value: string): string {
+  const sessionId = value.trim();
   if (!SESSION_ID_PATTERN.test(sessionId)) {
     throw new BadRequestError("sessionId is invalid.");
   }
-
-  return { sessionId };
+  return sessionId;
 }
 
-function servePublicFile(filename: string, contentType: string): Response {
-  return new Response(Bun.file(join(PUBLIC_DIR, filename)), {
+async function serveClientFile(pathname: string): Promise<Response | undefined> {
+  let relativePath: string;
+  try {
+    relativePath =
+      pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+  } catch {
+    return undefined;
+  }
+
+  if (!relativePath || relativePath.includes("\0")) {
+    return undefined;
+  }
+
+  const filename = resolve(CLIENT_DIST_DIR, relativePath);
+  const safeRelative = relative(CLIENT_DIST_DIR, filename);
+  if (safeRelative.startsWith("..") || isAbsolute(safeRelative)) {
+    return undefined;
+  }
+
+  const file = Bun.file(filename);
+  if (!(await file.exists())) {
+    return undefined;
+  }
+
+  return new Response(file, {
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": getContentType(filename),
     },
   });
+}
+
+function getContentType(filename: string): string {
+  switch (extname(filename)) {
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".json":
+    case ".map":
+      return "application/json; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 function jsonResponse(value: unknown, status = 200): Response {

@@ -3,12 +3,22 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": [
+        "src/client/*"
+      ]
+    },
     "lib": [
       "ES2022",
       "DOM"
     ],
     "types": [
-      "bun"
+      "bun",
+      "react",
+      "react-dom"
     ]
   },
   "include": [

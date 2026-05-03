@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   BadRequestError,
   CodingWebApprovalBroker,
+  CodingWebRunService,
   formatSseEvent,
   parseApprovalDecisionRequest,
   parseRunRequest,
@@ -118,5 +119,13 @@ describe("@kairos/coding-web server helpers", () => {
     expect(formatSseEvent("state", { status: "idle" })).toBe(
       'event: state\ndata: {"status":"idle"}\n\n',
     );
+  });
+
+  test("returns an empty state for unknown sessions", () => {
+    const service = new CodingWebRunService(".", "missing-provider", "missing-model");
+    const state = service.getState("session_1");
+
+    expect(state.items).toEqual([]);
+    expect(state.status).toBe("idle");
   });
 });
