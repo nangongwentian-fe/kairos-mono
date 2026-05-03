@@ -31,6 +31,7 @@ export function assertFileCanBeEdited(
   target: string,
   targetStat: Stats,
   requestedPath: string,
+  toolName = "edit_file",
 ): void {
   if (!fileState) {
     return;
@@ -39,13 +40,13 @@ export function assertFileCanBeEdited(
   const snapshot = fileState.readFiles.get(target);
   if (!snapshot) {
     throw new Error(
-      `File must be read with read_file before edit_file: ${requestedPath}`,
+      `File must be read with read_file before ${toolName}: ${requestedPath}`,
     );
   }
 
   if (snapshot.mtimeMs !== targetStat.mtimeMs || snapshot.size !== targetStat.size) {
     throw new Error(
-      `File changed since it was read. Read it again before edit_file: ${snapshot.path}`,
+      `File changed since it was read. Read it again before ${toolName}: ${snapshot.path}`,
     );
   }
 }

@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run client:build && bun --env-file=../../.env.local src/server.ts",
+    "dev": "bun --env-file=../../.env.local src/dev.ts",
+    "client:dev": "vite",
     "client:build": "vite build",
+    "server:dev": "bun --env-file=../../.env.local src/server.ts",
+    "start": "bun --env-file=../../.env.local src/server.ts",
     "build": "bun run client:build",
     "test": "bun test test",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -19,6 +19,7 @@ import type {
 } from "@kairos/ai";
 import {
   createCodingAgent,
+  DEFAULT_CODING_AGENT_MAX_TURNS,
   DEFAULT_CODING_AGENT_SYSTEM_PROMPT,
   type GrepResult,
   type ListDirResult,
@@ -90,9 +91,32 @@ describe("@kairos/coding-agent createCodingAgent", () => {
       "grep",
       "read_file",
       "todo_write",
+      "write_file",
       "edit_file",
       "run_command",
     ]);
+  });
+
+  test("uses a coding-agent default turn budget above short inspection loops", async () => {
+    const responses = [
+      ...Array.from({ length: 10 }, (_, index) =>
+        createListDirToolCallResponse(`call_${index + 1}`),
+      ),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream(responses, requests),
+    });
+
+    const result = await agent.run("Inspect the project");
+
+    expect(DEFAULT_CODING_AGENT_MAX_TURNS).toBeGreaterThanOrEqual(50);
+    expect(result.stopReason).toBe("end_turn");
+    expect(result.turns).toBe(11);
+    expect(requests).toHaveLength(11);
   });
 
   test("creates an agent with the default list_dir tool", async () => {

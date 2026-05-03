@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   Agent,
+  DEFAULT_AGENT_MAX_TURNS,
   type AgentStreamFunction,
   type AgentTool,
 } from "../src/index";
@@ -499,6 +500,33 @@ describe("@kairos/agent minimal loop", () => {
     expect(executed).toBe(false);
     expect(result.stopReason).toBe("max_turns");
     expect(result.turns).toBe(1);
+  });
+
+  test("uses a higher default max turn budget", async () => {
+    const tool: AgentTool = {
+      name: "noop",
+      description: "No-op",
+      execute: () => "ok",
+    };
+    const responses = [
+      ...Array.from({ length: 10 }, (_, index) =>
+        createToolCallResponse(`call_${index + 1}`, "noop"),
+      ),
+      createTextResponse("done"),
+    ];
+    const requests: ModelRequest[] = [];
+    const agent = new Agent({
+      model: TEST_MODEL,
+      tools: [tool],
+      stream: createSequenceStream(responses, requests),
+    });
+
+    const result = await agent.run("work");
+
+    expect(DEFAULT_AGENT_MAX_TURNS).toBeGreaterThanOrEqual(50);
+    expect(result.stopReason).toBe("end_turn");
+    expect(result.turns).toBe(11);
+    expect(requests).toHaveLength(11);
   });
 });
 

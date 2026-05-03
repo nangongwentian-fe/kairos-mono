@@ -115,6 +115,32 @@ describe("@kairos/coding-web server helpers", () => {
     await expect(decision).resolves.toBe(true);
   });
 
+  test("treats duplicate approval decisions as resolved", async () => {
+    const approvals = new CodingWebApprovalBroker();
+    const emitted: CodingWebApprovalRequest[] = [];
+    approvals.setEmitter((approval) => {
+      emitted.push(approval);
+    });
+
+    const toolCall = {
+      id: "call_1",
+      name: "run_command",
+      arguments: { command: "echo", args: ["hello"] },
+    } as Parameters<CodingWebApprovalBroker["request"]>[1];
+    const tool = {
+      name: "run_command",
+      risk: "execute",
+    } as Parameters<CodingWebApprovalBroker["request"]>[2];
+
+    const decision = approvals.request("session_1", toolCall, tool, "echo hello");
+    const approvalId = emitted[0].id;
+
+    expect(approvals.resolve("session_1", approvalId, true)).toBe(true);
+    expect(approvals.resolve("session_1", approvalId, true)).toBe(true);
+    expect(approvals.resolve("session_1", approvalId, false)).toBe(false);
+    await expect(decision).resolves.toBe(true);
+  });
+
   test("formats server-sent events", () => {
     expect(formatSseEvent("state", { status: "idle" })).toBe(
       'event: state\ndata: {"status":"idle"}\n\n',

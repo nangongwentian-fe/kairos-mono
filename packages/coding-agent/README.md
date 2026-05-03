@@ -102,20 +102,24 @@ Current behavior:
 - `read_file` reads UTF-8 text files.
 - `todo_write` stores the current run's structured task list in memory and returns old/new todos plus status counts.
 - `createCodingAgent()` adds an internal middleware reminder to the next model turn when `todo_write` has not been used recently. The default threshold is 5 assistant turns and can be disabled with `todoReminder: false`.
-- `createCodingAgent()` also adds a tool policy middleware by default. It blocks high-risk `run_command` inputs such as `rm -rf`, `sudo`, `chmod 777`, and `chown`, and blocks `edit_file` for protected paths such as `.env*`, `.git/**`, and `node_modules/**`.
+- `createCodingAgent()` also adds a tool policy middleware by default. It blocks high-risk `run_command` inputs such as `rm -rf`, `sudo`, `chmod 777`, and `chown`, and blocks `write_file` / `edit_file` for protected paths such as `.env*`, `.git/**`, and `node_modules/**`.
+- `write_file` creates a new UTF-8 text file and returns a JSON summary with a diff. It can overwrite existing files only when `overwrite: true`.
 - `edit_file` edits an existing UTF-8 text file by replacing exact text and returns a JSON summary with a diff.
 - `run_command` runs a non-interactive command without a shell and returns JSON with exit code, stdout, stderr, timeout, and truncation metadata.
 - Read-only built-in tools are marked as `risk: "read"` and run without confirmation.
 - `todo_write` is run-local planning state, not long-term task persistence.
+- `write_file` is marked as `risk: "write"` and passes a diff preview to `confirmToolCall` before writing.
 - `edit_file` is marked as `risk: "write"` and passes a diff preview to `confirmToolCall` before writing.
 - `run_command` is marked as `risk: "execute"` and passes a command preview to `confirmToolCall` before running.
+- The default `write_file` tool requires a successful `read_file` call for the same file before overwriting it.
 - The default `edit_file` tool requires a successful `read_file` call for the same file first.
-- If the file changes after `read_file`, `edit_file` rejects the write and asks the agent to read it again.
+- If the file changes after `read_file`, `write_file` and `edit_file` reject the write and ask the agent to read it again.
 - Relative paths are resolved from the configured `root`.
 - Absolute paths are allowed only when they stay inside `root`.
 - Missing files, directories used as files, files used as directories, non-regular files, and path escapes are rejected.
 - Symlink paths that point outside `root` are rejected.
 - `grep` skips `.git`, `node_modules`, `dist`, `build`, and `coverage` by default, and caps result count and line length.
+- `write_file` rejects existing files unless `overwrite: true`, unchanged overwrites, and missing parent directories.
 - `edit_file` rejects missing `oldText`, unchanged replacements, and multiple matches unless `replaceAll: true`.
 - `run_command` requires `args` to be an array of strings, runs with `shell: false`, caps output, and has a bounded timeout.
 - Workspace diffs include staged, unstaged, and untracked files. They are review data only; Kairos does not automatically undo, commit, or reset files.
@@ -141,7 +145,7 @@ src
 ├── session.ts      # reusable multi-turn coding session
 ├── session-store.ts # local JSON session records
 ├── task.ts         # runCodingTask helper
-├── tool-policy.ts  # edit_file and run_command guardrails
+├── tool-policy.ts  # write_file, edit_file, and run_command guardrails
 ├── todo-reminder.ts # todo_write stale reminder policy
 ├── types.ts        # public coding-agent types
 ├── workspace-diff.ts # optional git workspace diff collection
@@ -150,6 +154,7 @@ src
     ├── list-dir.ts
     ├── grep.ts
     ├── todo-write.ts
+    ├── write-file.ts
     ├── edit-file.ts
     ├── run-command.ts
     ├── args.ts

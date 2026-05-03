@@ -60,8 +60,9 @@ export function createCodingPermissionMiddleware(
   return {
     name: "coding_tool_policy",
     beforeToolCall: async (toolCall) => {
-      if (toolCall.name === "edit_file") {
-        return blockProtectedEditFilePath(
+      if (toolCall.name === "edit_file" || toolCall.name === "write_file") {
+        return blockProtectedFileWritePath(
+          toolCall.name,
           options.root,
           protectedPaths,
           toolCall.arguments,
@@ -80,7 +81,8 @@ export function createCodingPermissionMiddleware(
   };
 }
 
-async function blockProtectedEditFilePath(
+async function blockProtectedFileWritePath(
+  toolName: string,
   root: string,
   protectedPaths: readonly string[],
   args: JsonValue,
@@ -99,7 +101,7 @@ async function blockProtectedEditFilePath(
   }
 
   return block(
-    `Tool policy blocked edit_file: protected path "${normalizedPath}" matches "${matchedPattern}".`,
+    `Tool policy blocked ${toolName}: protected path "${normalizedPath}" matches "${matchedPattern}".`,
   );
 }
 

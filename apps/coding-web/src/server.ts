@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { requireModel } from "@kairos/ai";
 import {
+  DEFAULT_CODING_AGENT_MAX_TURNS,
   createCodingSession,
   type CodingSession,
   type CodingSessionOptions,
@@ -24,6 +25,7 @@ const MAX_INPUT_LENGTH = 12000;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 const APPROVAL_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
+const RESOLVED_APPROVAL_CACHE_MS = 60 * 1000;
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const CLIENT_DIST_DIR = join(APP_DIR, "dist/client");
@@ -56,6 +58,7 @@ export interface CodingWebServerOptions {
   root?: string;
   provider?: string;
   modelId?: string;
+  maxTurns?: number;
 }
 
 interface CodingWebSessionRecord {
@@ -79,8 +82,15 @@ interface PendingApproval {
   timeout: ReturnType<typeof setTimeout>;
 }
 
+interface ResolvedApproval {
+  sessionId: string;
+  allowed: boolean;
+  timeout: ReturnType<typeof setTimeout>;
+}
+
 export class CodingWebApprovalBroker {
   private readonly pending = new Map<string, PendingApproval>();
+  private readonly resolved = new Map<string, ResolvedApproval>();
   private emit?: (approval: CodingWebApprovalRequest) => void;
 
   setEmitter(emit: ((approval: CodingWebApprovalRequest) => void) | undefined): void {
@@ -129,11 +139,12 @@ export class CodingWebApprovalBroker {
   resolve(sessionId: string, approvalId: string, allowed: boolean): boolean {
     const pending = this.pending.get(approvalId);
     if (!pending || pending.sessionId !== sessionId) {
-      return false;
+      return this.isDuplicateResolution(sessionId, approvalId, allowed);
     }
 
     clearTimeout(pending.timeout);
     this.pending.delete(approvalId);
+    this.rememberResolved(sessionId, approvalId, allowed);
     pending.resolve(allowed);
     return true;
   }
@@ -142,8 +153,42 @@ export class CodingWebApprovalBroker {
     for (const [approvalId, pending] of this.pending) {
       clearTimeout(pending.timeout);
       this.pending.delete(approvalId);
+      this.rememberResolved(pending.sessionId, approvalId, false);
       pending.resolve(false);
     }
+  }
+
+  private isDuplicateResolution(
+    sessionId: string,
+    approvalId: string,
+    allowed: boolean,
+  ): boolean {
+    const resolved = this.resolved.get(approvalId);
+    return (
+      resolved?.sessionId === sessionId &&
+      resolved.allowed === allowed
+    );
+  }
+
+  private rememberResolved(
+    sessionId: string,
+    approvalId: string,
+    allowed: boolean,
+  ): void {
+    const previous = this.resolved.get(approvalId);
+    if (previous) {
+      clearTimeout(previous.timeout);
+    }
+
+    const timeout = setTimeout(() => {
+      this.resolved.delete(approvalId);
+    }, RESOLVED_APPROVAL_CACHE_MS);
+
+    this.resolved.set(approvalId, {
+      sessionId,
+      allowed,
+      timeout,
+    });
   }
 }
 
@@ -154,6 +199,7 @@ export class CodingWebRunService {
     private readonly root: string,
     private readonly provider: string,
     private readonly modelId: string,
+    private readonly maxTurns: number = DEFAULT_CODING_AGENT_MAX_TURNS,
   ) {}
 
   getState(sessionId: string): WebUiState {
@@ -162,6 +208,10 @@ export class CodingWebRunService {
 
   run(request: CodingWebRunRequest): ReadableStream<Uint8Array> {
     const record = this.getOrCreateSession(request.sessionId);
+    if (record.session.state.isRunning) {
+      throw new BadRequestError("session is already running.");
+    }
+
     const encoder = new TextEncoder();
 
     return new ReadableStream<Uint8Array>({
@@ -224,6 +274,7 @@ export class CodingWebRunService {
       session: createCodingSession({
         root: this.root,
         model,
+        maxTurns: this.maxTurns,
         recordWorkspaceDiff: { includeDiff: false },
         confirmToolCall: (toolCall, tool, preview) =>
           approvals.request(sessionId, toolCall, tool, preview),
@@ -300,7 +351,11 @@ export function createCodingWebServer(
   const root = resolve(options.root ?? env.KAIROS_CODING_WEB_ROOT ?? DEFAULT_ROOT);
   const provider = options.provider ?? env.KAIROS_CODING_WEB_PROVIDER ?? DEFAULT_PROVIDER;
   const modelId = options.modelId ?? env.KAIROS_CODING_WEB_MODEL ?? DEFAULT_MODEL_ID;
-  const service = new CodingWebRunService(root, provider, modelId);
+  const maxTurns =
+    options.maxTurns ??
+    readPositiveInteger(env.KAIROS_CODING_WEB_MAX_TURNS) ??
+    DEFAULT_CODING_AGENT_MAX_TURNS;
+  const service = new CodingWebRunService(root, provider, modelId, maxTurns);
 
   return Bun.serve({
     hostname: host,
@@ -428,12 +483,16 @@ function errorResponse(error: unknown): Response {
 }
 
 function readPort(value: string | undefined): number | undefined {
+  return readPositiveInteger(value);
+}
+
+function readPositiveInteger(value: string | undefined): number | undefined {
   if (!value) {
     return undefined;
   }
 
-  const port = Number(value);
-  return Number.isInteger(port) && port > 0 ? port : undefined;
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : undefined;
 }
 
 function readString(value: unknown, key: string): string {

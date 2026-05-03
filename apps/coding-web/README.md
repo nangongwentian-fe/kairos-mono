@@ -15,13 +15,14 @@ bun run coding-web:dev
 Open:
 
 ```text
-http://127.0.0.1:4174
+http://127.0.0.1:4173
 ```
 
 ## Current Scope
 
 - The client is a React + Vite app.
-- The Bun server serves the built client from `dist/client`.
+- In development, Vite serves the React client and proxies `/api/*` to the Bun server.
+- In production-style runs, the Bun server serves the built client from `dist/client`.
 - The Bun server keeps model keys on the server.
 - Browser requests stream `@kairos/web-ui` state updates over server-sent events.
 - The UI renders user messages, assistant text, tool calls, approvals, and `todo_write`.
@@ -60,6 +61,14 @@ src/client
 | `GET /api/session?sessionId=...` | Read the current in-memory Web UI state for a session. |
 | `POST /api/run` | Start one agent turn and stream state updates over server-sent events. |
 | `POST /api/approval` | Resolve one pending browser approval. |
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `KAIROS_CODING_WEB_MAX_TURNS` | `50` | Maximum agent turns for one browser run. |
+| `KAIROS_CODING_WEB_PORT` | `4174` | Bun API server port. |
+| `KAIROS_CODING_WEB_CLIENT_PORT` | `4173` | Vite client port in development. |
 
 ## Notes
 

@@ -46,6 +46,23 @@ export interface EditFileResult {
   diff: string;
 }
 
+export interface WriteFileToolOptions {
+  root: string;
+  fileState?: CodingAgentFileState;
+}
+
+export interface WriteFileToolArgs extends Record<string, JsonValue> {
+  path: string;
+  content: string;
+}
+
+export interface WriteFileResult {
+  path: string;
+  operation: "create" | "update";
+  bytes: number;
+  diff: string;
+}
+
 export interface ListDirToolOptions {
   root: string;
 }

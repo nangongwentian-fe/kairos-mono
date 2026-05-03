@@ -19,6 +19,9 @@ import {
   type WebUiTranscriptItem,
 } from "./types.js";
 
+const MAX_TURNS_TOOL_ERROR =
+  "Stopped before running because the agent reached the max turn limit.";
+
 export function createInitialWebUiState(): WebUiState {
   return {
     version: KAIROS_WEB_UI_EVENT_STATE_VERSION,
@@ -60,9 +63,7 @@ export function reduceWebUiEvent(
           stopReason: event.result.stopReason,
           turns: event.result.turns,
         },
-        items: state.items.map((item) =>
-          item.kind === "assistant" ? { ...item, streaming: false } : item,
-        ),
+        items: finalizeItemsForAgentEnd(state.items, event.result.stopReason),
       };
   }
 }
@@ -115,6 +116,29 @@ export function failWebUiRun(
       item.kind === "assistant" ? { ...item, streaming: false } : item,
     ),
   };
+}
+
+function finalizeItemsForAgentEnd(
+  items: readonly WebUiTranscriptItem[],
+  stopReason: string,
+): WebUiTranscriptItem[] {
+  return items.map((item) => {
+    if (item.kind === "assistant") {
+      return { ...item, streaming: false };
+    }
+    if (
+      stopReason === "max_turns" &&
+      item.kind === "tool" &&
+      (item.status === "pending" || item.status === "running")
+    ) {
+      return {
+        ...item,
+        status: "error",
+        content: MAX_TURNS_TOOL_ERROR,
+      };
+    }
+    return item;
+  });
 }
 
 export function parseWebUiTodoUpdate(

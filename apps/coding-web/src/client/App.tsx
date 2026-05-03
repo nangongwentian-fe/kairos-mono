@@ -45,6 +45,7 @@ import { useRequest } from "ahooks";
 const LEGACY_SESSION_KEY = "kairos-coding-web-session-id";
 const SESSION_STORE_KEY = "kairos-coding-web-session-store";
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
+const TRANSCRIPT_AUTO_SCROLL_THRESHOLD = 96;
 
 interface CodingWebApprovalRequest {
   id: string;
@@ -96,6 +97,9 @@ export function App() {
   const [approval, setApproval] = useState<CodingWebApprovalRequest>();
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const shouldFollowTranscriptRef = useRef(true);
+  const runningRef = useRef(false);
+  const approvalDecisionRef = useRef(false);
   const { loading: sessionLoading, runAsync: sessionStateRequest } = useRequest(
     requestSessionState,
     { manual: true },
@@ -110,6 +114,10 @@ export function App() {
   }, [sessionStore]);
 
   useEffect(() => {
+    if (!shouldFollowTranscriptRef.current) {
+      return;
+    }
+
     const scrollElement = transcriptScrollRef.current;
     if (scrollElement) {
       scrollElement.scrollTop = scrollElement.scrollHeight;
@@ -118,10 +126,24 @@ export function App() {
     transcriptEndRef.current?.scrollIntoView({ block: "end" });
   }, [state.items, approval]);
 
+  function handleTranscriptScroll() {
+    const scrollElement = transcriptScrollRef.current;
+    if (!scrollElement) {
+      return;
+    }
+
+    const distanceFromBottom =
+      scrollElement.scrollHeight -
+      scrollElement.scrollTop -
+      scrollElement.clientHeight;
+    shouldFollowTranscriptRef.current =
+      distanceFromBottom <= TRANSCRIPT_AUTO_SCROLL_THRESHOLD;
+  }
+
   async function runPrompt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextInput = input.trim();
-    if (busy) {
+    if (runningRef.current) {
       return;
     }
     if (!nextInput) {
@@ -129,7 +151,9 @@ export function App() {
       return;
     }
 
+    runningRef.current = true;
     setBusy(true);
+    shouldFollowTranscriptRef.current = true;
     setNotice("");
     setApproval(undefined);
     setSessionStore((latest) =>
@@ -169,19 +193,21 @@ export function App() {
     } catch (error) {
       setNotice(formatError(error));
     } finally {
+      runningRef.current = false;
       setBusy(false);
     }
   }
 
   async function respondToApproval(decision: "allow" | "deny") {
-    if (!approval || approvalBusy) {
+    if (!approval || approvalDecisionRef.current) {
       return;
     }
 
     const currentApproval = approval;
+    approvalDecisionRef.current = true;
     try {
       await approvalDecisionRequest({
-        sessionId,
+        sessionId: currentApproval.sessionId,
         approvalId: currentApproval.id,
         decision,
       });
@@ -190,7 +216,15 @@ export function App() {
       );
       setNotice(decision === "allow" ? "Tool approved." : "Tool denied.");
     } catch (error) {
-      setNotice(formatError(error));
+      const message = formatError(error);
+      if (message.includes("approval not found")) {
+        setApproval((latest) =>
+          latest?.id === currentApproval.id ? undefined : latest,
+        );
+      }
+      setNotice(message);
+    } finally {
+      approvalDecisionRef.current = false;
     }
   }
 
@@ -207,6 +241,7 @@ export function App() {
       };
     });
     setState(createInitialWebUiState());
+    shouldFollowTranscriptRef.current = true;
     setInput("");
     setNotice("");
     setApproval(undefined);
@@ -222,6 +257,7 @@ export function App() {
     try {
       const nextState = await sessionStateRequest(nextSessionId);
       setState(nextState);
+      shouldFollowTranscriptRef.current = true;
       setInput("");
       setSessionStore((latest) => ({
         activeSessionId: nextSessionId,
@@ -267,6 +303,7 @@ export function App() {
 
         <div
           className="min-h-0 overflow-x-hidden overflow-y-auto px-5 py-5"
+          onScroll={handleTranscriptScroll}
           ref={transcriptScrollRef}
         >
           <Transcript items={state.items} />
@@ -545,7 +582,7 @@ function ToolMessage({ item }: { item: WebUiToolTranscriptItem }) {
   const state = toToolPartState(item.status);
 
   return (
-    <Tool className="max-w-[760px]" defaultOpen={item.status !== "completed"}>
+    <Tool className="max-w-[760px]" defaultOpen={false}>
       <ToolHeader
         state={state}
         title={item.toolCall.name}

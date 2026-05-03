@@ -123,6 +123,52 @@ describe("@kairos/web-ui event state", () => {
     });
   });
 
+  test("marks pending tools as errors when max turns is reached", () => {
+    const toolCall: ToolCall = {
+      id: "call_read",
+      name: "read_file",
+      arguments: { path: "README.md" },
+    };
+    const response: ModelResponse = {
+      message: {
+        role: "assistant",
+        content: [{ type: "tool-call", call: toolCall }],
+      },
+      stopReason: "tool_calls",
+    };
+
+    const state = reduceEvents([
+      { type: "agent_start", input: "Read README" },
+      { type: "turn_start", turn: 1, messages: [] },
+      {
+        type: "model_event",
+        turn: 1,
+        event: { type: "tool_call", toolCall },
+      },
+      { type: "turn_end", turn: 1, response },
+      {
+        type: "agent_end",
+        result: {
+          messages: [],
+          response,
+          turns: 1,
+          stopReason: "max_turns",
+        },
+      },
+    ]);
+
+    const tool = state.items.find(
+      (item): item is WebUiToolTranscriptItem => item.kind === "tool",
+    );
+
+    expect(state.result).toEqual({ stopReason: "max_turns", turns: 1 });
+    expect(tool).toMatchObject({
+      status: "error",
+      content:
+        "Stopped before running because the agent reached the max turn limit.",
+    });
+  });
+
   test("extracts todo_write results for a future todo panel", () => {
     const todos = [
       { id: "inspect", content: "Inspect code", status: "completed" },

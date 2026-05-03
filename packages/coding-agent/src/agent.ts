@@ -15,10 +15,12 @@ import {
   createReadFileTool,
   createRunCommandTool,
   createTodoWriteTool,
+  createWriteFileTool,
 } from "./tools/index.js";
 
 export const DEFAULT_CODING_AGENT_SYSTEM_PROMPT =
-  "You are a coding agent. Use todo_write to track non-trivial multi-step work. Use list_dir to inspect directories, grep to search file contents, and read_file to inspect files before answering. Use edit_file for precise text replacements only after reading the target file. Use run_command to verify changes with tests or type checks when needed. Do not claim to have inspected, edited, or verified a path unless you used a tool.";
+  "You are a coding agent. Use todo_write to track non-trivial multi-step work. Use list_dir to inspect directories, grep to search file contents, and read_file to inspect files before answering. Use write_file to create new files or perform full-file rewrites, and use edit_file for precise text replacements only after reading the target file. Use run_command to verify changes with tests or type checks when needed. Do not claim to have inspected, edited, or verified a path unless you used a tool.";
+export const DEFAULT_CODING_AGENT_MAX_TURNS = 50;
 
 export function createCodingAgent(options: CodingAgentOptions): Agent {
   const fileState = createCodingAgentFileState();
@@ -28,6 +30,7 @@ export function createCodingAgent(options: CodingAgentOptions): Agent {
       createGrepTool({ root: options.root }),
       createReadFileTool({ root: options.root, fileState }),
       createTodoWriteTool(),
+      createWriteFileTool({ root: options.root, fileState }),
       createEditFileTool({ root: options.root, fileState }),
       createRunCommandTool({ root: options.root }),
     ],
@@ -37,7 +40,7 @@ export function createCodingAgent(options: CodingAgentOptions): Agent {
     model: options.model,
     systemPrompt: options.systemPrompt ?? DEFAULT_CODING_AGENT_SYSTEM_PROMPT,
     tools,
-    maxTurns: options.maxTurns,
+    maxTurns: options.maxTurns ?? DEFAULT_CODING_AGENT_MAX_TURNS,
     messages: options.messages,
     stream: options.stream,
     confirmToolCall: options.confirmToolCall,
@@ -55,7 +58,10 @@ function createCodingAgentMiddleware(
   if (
     options.toolPolicy !== false &&
     tools.some(
-      (tool) => tool.name === "edit_file" || tool.name === "run_command",
+      (tool) =>
+        tool.name === "write_file" ||
+        tool.name === "edit_file" ||
+        tool.name === "run_command",
     )
   ) {
     middleware.push(

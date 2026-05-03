@@ -1,6 +1,7 @@
 export const KAIROS_CODING_AGENT_PACKAGE = "@kairos/coding-agent";
 
 export {
+  DEFAULT_CODING_AGENT_MAX_TURNS,
   DEFAULT_CODING_AGENT_SYSTEM_PROMPT,
   createCodingAgent,
 } from "./agent.js";
@@ -34,6 +35,7 @@ export {
   createReadFileTool,
   createRunCommandTool,
   createTodoWriteTool,
+  createWriteFileTool,
 } from "./tools/index.js";
 export type {
   CodingAgentFileSnapshot,
@@ -72,6 +74,9 @@ export type {
   TodoStatus,
   TodoWriteResult,
   TodoWriteToolArgs,
+  WriteFileResult,
+  WriteFileToolArgs,
+  WriteFileToolOptions,
   WorkspaceChangedFile,
   WorkspaceChangedFileStatus,
   WorkspaceDiffOptions,

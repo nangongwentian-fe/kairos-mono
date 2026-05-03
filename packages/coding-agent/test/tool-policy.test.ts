@@ -134,6 +134,38 @@ describe("@kairos/coding-agent tool policy", () => {
     );
   });
 
+  test("blocks protected write_file paths before confirmation", async () => {
+    let confirmed = false;
+    const agent = createCodingAgent({
+      root,
+      model: TEST_MODEL,
+      stream: createSequenceStream([
+        createToolCallResponse("call_1", "write_file", {
+          path: ".env.local",
+          content: "TOKEN=new\n",
+        }),
+        createTextResponse("blocked"),
+      ]),
+      confirmToolCall: () => {
+        confirmed = true;
+        return true;
+      },
+    });
+
+    const result = await agent.run("Write .env.local");
+
+    expect(confirmed).toBe(false);
+    expect(result.messages[2]).toEqual({
+      role: "tool",
+      toolCallId: "call_1",
+      toolName: "write_file",
+      content:
+        'Tool policy blocked write_file: protected path ".env.local" matches ".env*".',
+      isError: true,
+    });
+    await expect(readFile(join(root, ".env.local"), "utf8")).rejects.toThrow();
+  });
+
   test("allows custom protected path patterns", async () => {
     await writeFile(join(root, "README.md"), "hello old world\n", "utf8");
     const toolPolicy: CodingToolPolicyOptions = {

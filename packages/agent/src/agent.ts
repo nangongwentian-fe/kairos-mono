@@ -12,6 +12,8 @@ import type {
   AgentToolConfirmation,
 } from "./types.js";
 
+export const DEFAULT_AGENT_MAX_TURNS = 50;
+
 export class Agent {
   private readonly model: Model;
   private readonly systemPrompt?: string;
@@ -32,7 +34,7 @@ export class Agent {
     this.model = options.model;
     this.systemPrompt = options.systemPrompt;
     this.tools = options.tools ?? [];
-    this.maxTurns = options.maxTurns ?? 8;
+    this.maxTurns = options.maxTurns ?? DEFAULT_AGENT_MAX_TURNS;
     this.stream = options.stream ?? streamModel;
     this.confirmToolCall = options.confirmToolCall;
     this.middleware = options.middleware ?? [];

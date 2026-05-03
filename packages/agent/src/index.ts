@@ -1,6 +1,6 @@
 export const KAIROS_AGENT_PACKAGE = "@kairos/agent";
 
-export { Agent } from "./agent.js";
+export { Agent, DEFAULT_AGENT_MAX_TURNS } from "./agent.js";
 export { createTraceRecorder } from "./trace.js";
 export type {
   AgentEvent,
