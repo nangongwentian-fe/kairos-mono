@@ -16,7 +16,7 @@ import {
   parseApprovalDecisionRequest,
   parseRunRequest,
   type CodingWebApprovalRequest,
-} from "../src/server.js";
+} from "../src/server/index.js";
 
 describe("@kairos/coding-web server helpers", () => {
   let root: string;

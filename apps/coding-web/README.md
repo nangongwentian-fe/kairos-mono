@@ -34,24 +34,38 @@ http://127.0.0.1:4173
 - Approval is per tool call. The browser can allow once or deny.
 - The server still applies the coding-agent tool policy before approval, so protected paths and blocked commands do not reach the browser prompt.
 
-## Client Layout
+## Source Layout
 
 ```text
-src/client
-  App.tsx
-    React app shell, session list, message list, prompt form
+src/
+  client/
+    App.tsx
+      React app shell, session list, message list, prompt form
 
-  components/ai-elements
-    AI Elements components installed into this app
+    components/
+      AI Elements and shadcn/ui components installed into this app
 
-  components/ui
-    shadcn/ui primitives used by the app
+    main.tsx
+      React entry
 
-  main.tsx
-    React entry
+    styles.css
+      Tailwind CSS and app-level response styles
 
-  styles.css
-    Tailwind CSS and app-level response styles
+  server/
+    main.ts
+      Bun server entry
+
+    index.ts
+      Server factory and request routing
+
+    service.ts
+      Coding session runtime and persistence
+
+    approvals.ts
+      Browser approval broker
+
+    requests.ts / responses.ts / static.ts
+      Request parsing, response helpers, and built client serving
 ```
 
 ## Server API

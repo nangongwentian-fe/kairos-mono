@@ -21,7 +21,7 @@ await assertPortAvailable("API server", SERVER_HOST, SERVER_PORT);
 await assertPortAvailable("Vite client", CLIENT_HOST, CLIENT_PORT);
 
 const server = Bun.spawn({
-  cmd: ["bun", "src/server.ts"],
+  cmd: ["bun", "src/server/main.ts"],
   cwd: APP_DIR,
   env: childEnv,
   stderr: "inherit",
