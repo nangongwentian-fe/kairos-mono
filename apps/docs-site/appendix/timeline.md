@@ -2,7 +2,7 @@
 
 ## 从 0 到现在
 
-1. 确认主线目标：优先学习 Agent 设计，而不是先做完整产品。
+1. 确认早期实现重心：先学习 Agent 设计，用小切片逐步推进完整产品框架。
 2. 决定第一个 package 先做 `@kairos/ai`，因为模型协议是后续 Agent 的基础。
 3. 原计划先做 `FakeModel`，后来改成真实接入 OpenCode Go。
 4. 在 `@kairos/ai` 保留统一协议：`Message`、`ToolDefinition`、`ModelRequest`、`ModelResponse`、`ModelStreamEvent`。

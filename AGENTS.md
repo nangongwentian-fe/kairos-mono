@@ -1,5 +1,13 @@
 # 项目记忆
 
+## 项目目标和实现节奏
+
+- Kairos 的目标是完整的 Agent 产品框架，参考对象包括 `pi-mono`、`codex`、`claude-code`、`hermes-agent`、`langchain`、`opencode` 等成熟项目。
+- “小范围实现”是开发节奏，不是产品边界；不要把它理解成 Kairos 只做最小 Agent Runtime。
+- 长期架构需要的基础边界，如果可以用小切片完成，应该尽早处理；例如 Agent 内部消息和模型消息分层、运行事件、工具策略、会话状态、扩展点。
+- 每次实现仍然只做一个可理解、可验证的切片，避免一次引入大量能力导致 bug 增多、review 压力变大。
+- 参考成熟项目时，要区分“长期目标应该具备的边界”和“本次切片暂不实现的完整能力”。不能因为当前不实现完整能力，就否定底层抽象的必要性。
+
 ## References 设计参考
 
 - 以后设计或实现 `packages/*` 下任何 package 时，先参考 `/Users/zhengwenjie/Documents/People/references`。
@@ -22,6 +30,6 @@
 - `createCodingAgent()` 保持为薄工厂：组合 `@kairos/agent`、默认 coding system prompt、内置工具和用户传入工具。
 - 自定义工具同名时覆盖内置工具，方便测试打桩，也方便后续替换内置实现。
 - `@kairos/tui` 是通用终端 UI/event helper；`@kairos/coding-tui` 组合 `@kairos/coding-agent` 和 `@kairos/tui` 提供 coding CLI，不要让 `@kairos/tui` 反向依赖 `@kairos/coding-agent`。
-- 暂时不要把 memory、workflow、subagent、checkpoint、human interrupt、sandbox 全部放进 `createCodingAgent()`；这些等场景明确后单独加。
-- 不要提前引入完整权限系统、持久化、上下文压缩、多 agent 编排、插件系统等重能力，除非当前任务明确需要。
+- 暂时不要把 memory、workflow、subagent、checkpoint、human interrupt、sandbox 全部放进 `createCodingAgent()`；这些能力后续可以有，但应该按独立切片加入。
+- 不要一次性引入完整权限系统、持久化、上下文压缩、多 agent 编排、插件系统等大模块；但如果某个底层边界会影响这些长期能力，应该先用轻量抽象预留。
 - 新增或调整 `@kairos/*` package 依赖时，必须同步检查 `docs/package-boundaries.md` 和 `test/package-boundaries.test.ts`；依赖方向默认保持 `ai -> agent -> coding-agent`，通用 UI 层不要反向依赖产品层。
