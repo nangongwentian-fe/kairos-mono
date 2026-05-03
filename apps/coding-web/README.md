@@ -26,9 +26,10 @@ http://127.0.0.1:4173
 - The Bun server keeps model keys on the server.
 - Browser requests stream `@kairos/web-ui` state updates over server-sent events.
 - The UI renders user messages, assistant text, tool calls, approvals, and `todo_write`.
-- Sessions are listed in the sidebar. `New` starts a fresh browser session.
-- Session metadata is stored in browser `localStorage`; live session state stays in server memory.
-- Switching sessions loads the current server-side state for that session id.
+- Sessions are listed in the sidebar. `New` starts a fresh browser session, and each saved session can be deleted from the list.
+- Sessions are persisted under `.kairos/sessions/` through `@kairos/coding-agent`.
+- The browser stores only the active session id in `localStorage`.
+- Switching sessions loads the current server-side or persisted state for that session id.
 - Write and execute tools pause for browser approval before they run.
 - Approval is per tool call. The browser can allow once or deny.
 - The server still applies the coding-agent tool policy before approval, so protected paths and blocked commands do not reach the browser prompt.
@@ -58,6 +59,9 @@ src/client
 | Route | Purpose |
 | --- | --- |
 | `GET /api/health` | Health check. |
+| `GET /api/sessions` | List persisted coding sessions for the current workspace. |
+| `POST /api/sessions` | Create a new persisted coding session. |
+| `DELETE /api/sessions/:id` | Delete one persisted coding session. |
 | `GET /api/session?sessionId=...` | Read the current in-memory Web UI state for a session. |
 | `POST /api/run` | Start one agent turn and stream state updates over server-sent events. |
 | `POST /api/approval` | Resolve one pending browser approval. |
@@ -74,4 +78,4 @@ src/client
 
 - `@kairos/web-ui` owns protocol and state helpers.
 - `apps/coding-web` owns React components, routing-free app layout, and browser-specific behavior.
-- Server restarts clear live session state. Browser session metadata remains, so an old session may reopen as an empty state after restart.
+- Server restarts clear pending approvals and running state. Completed session messages are restored from `.kairos/sessions/`.

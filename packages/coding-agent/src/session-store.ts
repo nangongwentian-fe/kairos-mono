@@ -1,6 +1,6 @@
 import type { Message, Model } from "@kairos/ai";
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CodingSessionRecord, CodingSessionSummary } from "./types.js";
 
@@ -83,6 +83,23 @@ export async function readCodingSessionRecord(
   } catch (error) {
     if (isNotFoundError(error)) {
       return undefined;
+    }
+    throw error;
+  }
+}
+
+export async function deleteCodingSessionRecord(
+  directory: string,
+  id: string,
+): Promise<boolean> {
+  assertSafeCodingSessionId(id);
+
+  try {
+    await unlink(getCodingSessionRecordPath(directory, id));
+    return true;
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return false;
     }
     throw error;
   }

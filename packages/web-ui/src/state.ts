@@ -1,6 +1,7 @@
 import type { AgentEvent } from "@kairos/agent";
 import type {
   AssistantMessage,
+  Message,
   ModelResponse,
   ModelStreamEvent,
   ToolCall,
@@ -28,6 +29,147 @@ export function createInitialWebUiState(): WebUiState {
     status: "idle",
     runId: 0,
     items: [],
+  };
+}
+
+export function createWebUiStateFromMessages(
+  messages: readonly Message[],
+): WebUiState {
+  let state = createInitialWebUiState();
+  let runId = 0;
+  let turn = 0;
+  const toolCalls = new Map<
+    string,
+    { runId: number; turn: number; toolCall: ToolCall }
+  >();
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      runId += 1;
+      turn = 0;
+      state = {
+        ...state,
+        runId,
+        input: message.content,
+        items: [
+          ...state.items,
+          {
+            id: createUserItemId(runId),
+            kind: "user",
+            runId,
+            text: message.content,
+          },
+        ],
+      };
+      continue;
+    }
+
+    if (message.role === "assistant") {
+      if (runId === 0) {
+        runId = 1;
+      }
+      turn += 1;
+
+      const assistantToolCalls = getToolCalls(message);
+      const toolItemIds = assistantToolCalls.map((toolCall) =>
+        createToolItemId(runId, toolCall.id),
+      );
+      let items: WebUiTranscriptItem[] = [
+        ...state.items,
+        {
+          id: createAssistantItemId(runId, turn),
+          kind: "assistant",
+          runId,
+          turn,
+          text: getAssistantText(message),
+          toolItemIds,
+          streaming: false,
+          stopReason: assistantToolCalls.length > 0 ? "tool_calls" : undefined,
+        },
+      ];
+
+      for (const toolCall of assistantToolCalls) {
+        toolCalls.set(toolCall.id, { runId, turn, toolCall });
+        items = [
+          ...items,
+          {
+            id: createToolItemId(runId, toolCall.id),
+            kind: "tool",
+            runId,
+            turn,
+            toolCallId: toolCall.id,
+            toolCall,
+            status: "pending",
+          },
+        ];
+      }
+
+      state = {
+        ...state,
+        runId,
+        currentTurn: undefined,
+        items,
+      };
+      continue;
+    }
+
+    if (runId === 0) {
+      runId = 1;
+    }
+
+    const savedToolCall = toolCalls.get(message.toolCallId);
+    const toolRunId = savedToolCall?.runId ?? runId;
+    const toolTurn = savedToolCall?.turn ?? Math.max(turn, 1);
+    const toolCall = savedToolCall?.toolCall ?? {
+      id: message.toolCallId,
+      name: message.toolName,
+      arguments: {},
+    };
+    const status: WebUiToolStatus = message.isError ? "error" : "completed";
+    const item: WebUiToolTranscriptItem = {
+      id: createToolItemId(toolRunId, message.toolCallId),
+      kind: "tool",
+      runId: toolRunId,
+      turn: toolTurn,
+      toolCallId: message.toolCallId,
+      toolCall,
+      status,
+      content: message.content,
+      result: message,
+    };
+
+    state = {
+      ...state,
+      runId,
+      items: replaceOrAppendItem(
+        state.items,
+        createToolItemId(toolRunId, message.toolCallId),
+        item,
+      ),
+      todos:
+        toolCall.name === "todo_write" && !message.isError
+          ? parseWebUiTodoUpdate(toolCall.id, message.content) ?? state.todos
+          : state.todos,
+    };
+  }
+
+  if (state.items.length === 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    status: "completed",
+    currentTurn: undefined,
+    items: state.items.map((item) =>
+      item.kind === "tool" && item.status === "pending"
+        ? {
+            ...item,
+            status: "error",
+            content: "Tool result is not available in the saved session.",
+          }
+        : item,
+    ),
   };
 }
 

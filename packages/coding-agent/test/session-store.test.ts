@@ -7,6 +7,7 @@ import type { Model } from "@kairos/ai";
 import {
   assertSafeCodingSessionId,
   createCodingSessionRecord,
+  deleteCodingSessionRecord,
   getCodingSessionRecordPath,
   getDefaultCodingSessionStoreDir,
   listCodingSessionRecords,
@@ -106,6 +107,26 @@ describe("@kairos/coding-agent session store", () => {
       updatedAt: "2026-01-02T00:00:00.000Z",
       messages: [{ role: "user", content: "next" }],
     });
+  });
+
+  test("deletes a session record", async () => {
+    const directory = getDefaultCodingSessionStoreDir(root);
+    const record = createCodingSessionRecord({
+      id: "session-1",
+      root,
+      model: TEST_MODEL,
+    });
+    await writeCodingSessionRecord(record);
+
+    await expect(deleteCodingSessionRecord(directory, "session-1")).resolves.toBe(
+      true,
+    );
+    await expect(readCodingSessionRecord(directory, "session-1")).resolves.toBe(
+      undefined,
+    );
+    await expect(deleteCodingSessionRecord(directory, "session-1")).resolves.toBe(
+      false,
+    );
   });
 
   test("rejects unsafe session ids", () => {

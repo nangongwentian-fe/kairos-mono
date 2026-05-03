@@ -5,6 +5,7 @@ import type { ModelResponse, ToolCall } from "@kairos/ai";
 import {
   createInitialWebUiState,
   createWebUiEventStore,
+  createWebUiStateFromMessages,
   failWebUiRun,
   parseWebUiTodoUpdate,
   reduceWebUiEvent,
@@ -259,6 +260,59 @@ describe("@kairos/web-ui event state", () => {
     expect(store.getState()).toMatchObject({
       status: "failed",
       error: "network down",
+    });
+  });
+
+  test("reconstructs transcript state from saved messages", () => {
+    const toolCall: ToolCall = {
+      id: "call_todo",
+      name: "todo_write",
+      arguments: {
+        todos: [
+          { id: "inspect", content: "Inspect code", status: "completed" },
+        ],
+      },
+    };
+    const state = createWebUiStateFromMessages([
+      { role: "user", content: "Plan work" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "I will plan it." },
+          { type: "tool-call", call: toolCall },
+        ],
+      },
+      {
+        role: "tool",
+        toolCallId: "call_todo",
+        toolName: "todo_write",
+        content: JSON.stringify({
+          newTodos: [
+            { id: "inspect", content: "Inspect code", status: "completed" },
+          ],
+        }),
+      },
+      { role: "assistant", content: [{ type: "text", text: "Done." }] },
+    ]);
+
+    expect(state.status).toBe("completed");
+    expect(state.runId).toBe(1);
+    expect(state.items.map((item) => item.kind)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+      "assistant",
+    ]);
+    expect(state.todos?.completedCount).toBe(1);
+    expect(state.items[1]).toMatchObject({
+      id: "run:1:assistant:1",
+      text: "I will plan it.",
+      toolItemIds: ["run:1:tool:call_todo"],
+    });
+    expect(state.items[2]).toMatchObject({
+      id: "run:1:tool:call_todo",
+      status: "completed",
+      content: expect.stringContaining("Inspect code"),
     });
   });
 });

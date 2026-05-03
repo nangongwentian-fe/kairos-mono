@@ -1,4 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+  createCodingSessionRecord,
+  getDefaultCodingSessionStoreDir,
+  writeCodingSessionRecord,
+} from "@kairos/coding-agent";
+import { requireModel } from "@kairos/ai";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   BadRequestError,
   CodingWebApprovalBroker,
@@ -10,6 +19,16 @@ import {
 } from "../src/server.js";
 
 describe("@kairos/coding-web server helpers", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "kairos-coding-web-"));
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
   test("parses a valid run request", async () => {
     const request = new Request("http://localhost/api/run", {
       method: "POST",
@@ -147,11 +166,70 @@ describe("@kairos/coding-web server helpers", () => {
     );
   });
 
-  test("returns an empty state for unknown sessions", () => {
+  test("returns an empty state for unknown sessions", async () => {
     const service = new CodingWebRunService(".", "missing-provider", "missing-model");
-    const state = service.getState("session_1");
+    const state = await service.getState("session_1");
 
     expect(state.items).toEqual([]);
     expect(state.status).toBe("idle");
+  });
+
+  test("creates and lists persistent sessions", async () => {
+    const service = new CodingWebRunService(root, "opencode-go", "kimi-k2.6");
+
+    const session = await service.createSession();
+    const sessions = await service.listSessions();
+
+    expect(session).toMatchObject({
+      id: expect.any(String),
+      title: "Session",
+      messageCount: 0,
+    });
+    expect(sessions).toEqual([session]);
+  });
+
+  test("deletes persistent sessions", async () => {
+    const service = new CodingWebRunService(root, "opencode-go", "kimi-k2.6");
+
+    const session = await service.createSession();
+
+    await expect(service.deleteSession(session.id)).resolves.toBe(true);
+    await expect(service.listSessions()).resolves.toEqual([]);
+    await expect(service.deleteSession(session.id)).resolves.toBe(false);
+  });
+
+  test("loads saved session messages into web state", async () => {
+    const model = requireModel("opencode-go", "kimi-k2.6");
+    const record = createCodingSessionRecord({
+      id: "saved_session",
+      root,
+      model,
+      messages: [
+        { role: "user", content: "Read README" },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "README summary" }],
+        },
+      ],
+    });
+    await writeCodingSessionRecord(
+      record,
+      getDefaultCodingSessionStoreDir(root),
+    );
+    const service = new CodingWebRunService(root, "opencode-go", "kimi-k2.6");
+
+    const sessions = await service.listSessions();
+    const state = await service.getState("saved_session");
+
+    expect(sessions[0]).toMatchObject({
+      id: "saved_session",
+      title: "Read README",
+      messageCount: 2,
+    });
+    expect(state).toMatchObject({
+      status: "completed",
+      runId: 1,
+    });
+    expect(state.items.map((item) => item.kind)).toEqual(["user", "assistant"]);
   });
 });

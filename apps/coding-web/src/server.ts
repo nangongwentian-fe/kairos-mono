@@ -2,13 +2,23 @@
 import { requireModel } from "@kairos/ai";
 import {
   DEFAULT_CODING_AGENT_MAX_TURNS,
+  createCodingSessionRecord,
   createCodingSession,
+  deleteCodingSessionRecord,
+  getDefaultCodingSessionStoreDir,
+  listCodingSessionRecords,
+  readCodingSessionRecord,
+  updateCodingSessionRecord,
+  writeCodingSessionRecord,
   type CodingSession,
   type CodingSessionOptions,
+  type CodingSessionRecord,
+  type CodingSessionSummary,
 } from "@kairos/coding-agent";
 import {
   createInitialWebUiState,
   createWebUiEventStore,
+  createWebUiStateFromMessages,
   type WebUiEventStore,
   type WebUiState,
 } from "@kairos/web-ui";
@@ -52,6 +62,14 @@ export interface CodingWebApprovalRequest {
   preview?: string;
 }
 
+export interface CodingWebSessionSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
 export interface CodingWebServerOptions {
   host?: string;
   port?: number;
@@ -59,10 +77,12 @@ export interface CodingWebServerOptions {
   provider?: string;
   modelId?: string;
   maxTurns?: number;
+  sessionStoreDir?: string;
 }
 
 interface CodingWebSessionRecord {
   session: CodingSession;
+  sessionRecord: CodingSessionRecord;
   store: WebUiEventStore;
   approvals: CodingWebApprovalBroker;
 }
@@ -194,20 +214,66 @@ export class CodingWebApprovalBroker {
 
 export class CodingWebRunService {
   private readonly sessions = new Map<string, CodingWebSessionRecord>();
+  private readonly sessionStoreDir: string;
 
   constructor(
     private readonly root: string,
     private readonly provider: string,
     private readonly modelId: string,
     private readonly maxTurns: number = DEFAULT_CODING_AGENT_MAX_TURNS,
-  ) {}
-
-  getState(sessionId: string): WebUiState {
-    return this.sessions.get(sessionId)?.store.getState() ?? createInitialWebUiState();
+    sessionStoreDir?: string,
+  ) {
+    this.sessionStoreDir = sessionStoreDir ?? getDefaultCodingSessionStoreDir(root);
   }
 
-  run(request: CodingWebRunRequest): ReadableStream<Uint8Array> {
-    const record = this.getOrCreateSession(request.sessionId);
+  async listSessions(): Promise<CodingWebSessionSummary[]> {
+    const summaries = await listCodingSessionRecords(this.sessionStoreDir);
+    return summaries.map(formatSessionSummary);
+  }
+
+  async createSession(): Promise<CodingWebSessionSummary> {
+    const sessionRecord = createCodingSessionRecord({
+      root: this.root,
+      model: this.getModel(),
+    });
+    await writeCodingSessionRecord(sessionRecord, this.sessionStoreDir);
+    return formatSessionSummary({
+      id: sessionRecord.id,
+      createdAt: sessionRecord.createdAt,
+      updatedAt: sessionRecord.updatedAt,
+      messageCount: sessionRecord.messages.length,
+      firstUserMessage: undefined,
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    const existing = this.sessions.get(sessionId);
+    if (existing?.session.state.isRunning) {
+      throw new BadRequestError("session is already running.");
+    }
+
+    existing?.approvals.cancelAll();
+    this.sessions.delete(sessionId);
+    return deleteCodingSessionRecord(this.sessionStoreDir, sessionId);
+  }
+
+  async getState(sessionId: string): Promise<WebUiState> {
+    const existing = this.sessions.get(sessionId);
+    if (existing) {
+      return existing.store.getState();
+    }
+
+    const sessionRecord = await readCodingSessionRecord(
+      this.sessionStoreDir,
+      sessionId,
+    );
+    return sessionRecord
+      ? createWebUiStateFromMessages(sessionRecord.messages)
+      : createInitialWebUiState();
+  }
+
+  async run(request: CodingWebRunRequest): Promise<ReadableStream<Uint8Array>> {
+    const record = await this.getOrCreateSession(request.sessionId);
     if (record.session.state.isRunning) {
       throw new BadRequestError("session is already running.");
     }
@@ -228,12 +294,20 @@ export class CodingWebRunService {
 
         try {
           send("state", record.store.getState());
-          await record.session.run(request.input, {
+          const run = await record.session.run(request.input, {
             recordWorkspaceDiff: { includeDiff: false },
           });
+          record.sessionRecord = await this.saveSessionRecord(
+            record.sessionRecord,
+            run.result.messages,
+          );
           send("done", { state: record.store.getState() });
         } catch (error) {
           const state = record.store.fail(error);
+          record.sessionRecord = await this.saveSessionRecord(
+            record.sessionRecord,
+            record.session.state.messages,
+          );
           send("error", {
             message: formatError(error),
             state,
@@ -262,28 +336,58 @@ export class CodingWebRunService {
     }
   }
 
-  private getOrCreateSession(sessionId: string): CodingWebSessionRecord {
+  private async getOrCreateSession(
+    sessionId: string,
+  ): Promise<CodingWebSessionRecord> {
     const existing = this.sessions.get(sessionId);
     if (existing) {
       return existing;
     }
 
-    const model = requireModel(this.provider, this.modelId);
+    const model = this.getModel();
+    const sessionRecord =
+      (await readCodingSessionRecord(this.sessionStoreDir, sessionId)) ??
+      createCodingSessionRecord({
+        id: sessionId,
+        root: this.root,
+        model,
+      });
+    if (sessionRecord.messages.length === 0) {
+      await writeCodingSessionRecord(sessionRecord, this.sessionStoreDir);
+    }
+
     const approvals = new CodingWebApprovalBroker();
     const record: CodingWebSessionRecord = {
       session: createCodingSession({
         root: this.root,
         model,
         maxTurns: this.maxTurns,
+        messages: sessionRecord.messages,
         recordWorkspaceDiff: { includeDiff: false },
         confirmToolCall: (toolCall, tool, preview) =>
           approvals.request(sessionId, toolCall, tool, preview),
       }),
-      store: createWebUiEventStore(),
+      sessionRecord,
+      store: createWebUiEventStore(
+        createWebUiStateFromMessages(sessionRecord.messages),
+      ),
       approvals,
     };
     this.sessions.set(sessionId, record);
     return record;
+  }
+
+  private async saveSessionRecord(
+    record: CodingSessionRecord,
+    messages: readonly CodingSessionRecord["messages"][number][],
+  ): Promise<CodingSessionRecord> {
+    const nextRecord = updateCodingSessionRecord(record, { messages });
+    await writeCodingSessionRecord(nextRecord, this.sessionStoreDir);
+    return nextRecord;
+  }
+
+  private getModel() {
+    return requireModel(this.provider, this.modelId);
   }
 }
 
@@ -355,7 +459,13 @@ export function createCodingWebServer(
     options.maxTurns ??
     readPositiveInteger(env.KAIROS_CODING_WEB_MAX_TURNS) ??
     DEFAULT_CODING_AGENT_MAX_TURNS;
-  const service = new CodingWebRunService(root, provider, modelId, maxTurns);
+  const service = new CodingWebRunService(
+    root,
+    provider,
+    modelId,
+    maxTurns,
+    options.sessionStoreDir,
+  );
 
   return Bun.serve({
     hostname: host,
@@ -374,13 +484,26 @@ async function handleRequest(
     if (request.method === "GET" && url.pathname === "/api/health") {
       return jsonResponse({ ok: true });
     }
+    if (request.method === "GET" && url.pathname === "/api/sessions") {
+      return jsonResponse({ sessions: await service.listSessions() });
+    }
+    if (request.method === "POST" && url.pathname === "/api/sessions") {
+      return jsonResponse({ session: await service.createSession() });
+    }
+    if (
+      request.method === "DELETE" &&
+      url.pathname.startsWith("/api/sessions/")
+    ) {
+      const sessionId = parseSessionPathId(url.pathname);
+      return jsonResponse({ deleted: await service.deleteSession(sessionId) });
+    }
     if (request.method === "GET" && url.pathname === "/api/session") {
       const sessionId = parseSessionId(url.searchParams.get("sessionId") ?? "");
-      return jsonResponse({ state: service.getState(sessionId) });
+      return jsonResponse({ state: await service.getState(sessionId) });
     }
     if (request.method === "POST" && url.pathname === "/api/run") {
       const runRequest = await parseRunRequest(request);
-      return new Response(service.run(runRequest), {
+      return new Response(await service.run(runRequest), {
         headers: {
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
@@ -406,12 +529,44 @@ async function handleRequest(
   return new Response("Not found.", { status: 404 });
 }
 
+function formatSessionSummary(
+  summary: Pick<
+    CodingSessionSummary,
+    "id" | "createdAt" | "updatedAt" | "messageCount" | "firstUserMessage"
+  >,
+): CodingWebSessionSummary {
+  return {
+    id: summary.id,
+    title: formatSessionTitle(summary.firstUserMessage),
+    createdAt: summary.createdAt,
+    updatedAt: summary.updatedAt,
+    messageCount: summary.messageCount,
+  };
+}
+
+function formatSessionTitle(firstUserMessage: string | undefined): string {
+  const normalized = firstUserMessage?.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "Session";
+  }
+  return normalized.length > 42 ? `${normalized.slice(0, 39)}...` : normalized;
+}
+
 function parseSessionId(value: string): string {
   const sessionId = value.trim();
   if (!SESSION_ID_PATTERN.test(sessionId)) {
     throw new BadRequestError("sessionId is invalid.");
   }
   return sessionId;
+}
+
+function parseSessionPathId(pathname: string): string {
+  const rawSessionId = pathname.slice("/api/sessions/".length);
+  try {
+    return parseSessionId(decodeURIComponent(rawSessionId));
+  } catch {
+    throw new BadRequestError("sessionId is invalid.");
+  }
 }
 
 async function serveClientFile(pathname: string): Promise<Response | undefined> {

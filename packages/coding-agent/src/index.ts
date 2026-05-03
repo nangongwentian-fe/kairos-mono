@@ -16,6 +16,7 @@ export {
   CODING_SESSION_RECORD_VERSION,
   assertSafeCodingSessionId,
   createCodingSessionRecord,
+  deleteCodingSessionRecord,
   getCodingSessionRecordPath,
   getDefaultCodingSessionStoreDir,
   listCodingSessionRecords,

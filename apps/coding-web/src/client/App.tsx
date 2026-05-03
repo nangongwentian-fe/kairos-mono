@@ -19,8 +19,18 @@ import {
   type ToolPart,
 } from "@/components/ai-elements/tool";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { createInitialWebUiState } from "@kairos/web-ui";
 import type {
   WebUiAssistantTranscriptItem,
@@ -37,6 +47,7 @@ import {
   LoaderCircleIcon,
   PlayIcon,
   PlusIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +55,7 @@ import { useRequest } from "ahooks";
 
 const LEGACY_SESSION_KEY = "kairos-coding-web-session-id";
 const SESSION_STORE_KEY = "kairos-coding-web-session-store";
+const ACTIVE_SESSION_KEY = "kairos-coding-web-active-session-id";
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 const TRANSCRIPT_AUTO_SCROLL_THRESHOLD = 96;
 
@@ -72,46 +84,122 @@ interface ApprovalDecisionPayload {
 interface CodingWebSessionSummary {
   id: string;
   title: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
 }
 
-interface CodingWebSessionStore {
-  activeSessionId: string;
+interface CodingWebSessionListResponse {
   sessions: CodingWebSessionSummary[];
 }
 
+interface CodingWebCreateSessionResponse {
+  session: CodingWebSessionSummary;
+}
+
+interface InitialSessionLoad {
+  activeSessionId: string;
+  sessions: CodingWebSessionSummary[];
+  state: WebUiState;
+}
+
 export function App() {
-  const [sessionStore, setSessionStore] = useState<CodingWebSessionStore>(() =>
-    loadSessionStore(),
+  const [activeSessionId, setActiveSessionId] = useState(() =>
+    loadActiveSessionId(),
   );
-  const sessionId = sessionStore.activeSessionId;
+  const [sessions, setSessions] = useState<CodingWebSessionSummary[]>([]);
+  const [initialized, setInitialized] = useState(false);
+  const sessionId = activeSessionId || sessions[0]?.id || "";
   const activeSession = useMemo(
-    () => sessionStore.sessions.find((session) => session.id === sessionId),
-    [sessionId, sessionStore.sessions],
+    () => sessions.find((session) => session.id === sessionId),
+    [sessionId, sessions],
   );
   const [state, setState] = useState<WebUiState>(() => createInitialWebUiState());
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [approval, setApproval] = useState<CodingWebApprovalRequest>();
+  const [deleteTargetSession, setDeleteTargetSession] =
+    useState<CodingWebSessionSummary>();
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const shouldFollowTranscriptRef = useRef(true);
   const runningRef = useRef(false);
+  const initialActiveSessionIdRef = useRef(activeSessionId);
+  const initializeSessionsRef = useRef<Promise<InitialSessionLoad> | undefined>(
+    undefined,
+  );
   const approvalDecisionRef = useRef(false);
   const { loading: sessionLoading, runAsync: sessionStateRequest } = useRequest(
     requestSessionState,
     { manual: true },
   );
+  const { loading: sessionListLoading, runAsync: sessionListRequest } = useRequest(
+    requestSessions,
+    { manual: true },
+  );
+  const {
+    loading: sessionCreateLoading,
+    runAsync: sessionCreateRequest,
+  } = useRequest(requestCreateSession, { manual: true });
+  const {
+    loading: sessionDeleteLoading,
+    runAsync: sessionDeleteRequest,
+  } = useRequest(requestDeleteSession, { manual: true });
   const { loading: approvalBusy, runAsync: approvalDecisionRequest } =
     useRequest(requestApprovalDecision, { manual: true });
-  const requestBusy = busy || sessionLoading;
+  const requestBusy =
+    busy ||
+    sessionLoading ||
+    sessionListLoading ||
+    sessionCreateLoading ||
+    sessionDeleteLoading ||
+    !initialized;
+  const runDisabled = requestBusy || !sessionId;
   const sessionActionsDisabled = requestBusy || approvalBusy;
 
   useEffect(() => {
-    saveSessionStore(sessionStore);
-  }, [sessionStore]);
+    if (sessionId) {
+      saveActiveSessionId(sessionId);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    initializeSessionsRef.current ??= loadInitialSession({
+      activeSessionId: initialActiveSessionIdRef.current,
+      createSession: requestCreateSession,
+      listSessions: requestSessions,
+      loadState: requestSessionState,
+    });
+
+    initializeSessionsRef.current
+      .then((initialSession) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSessions(initialSession.sessions);
+        setActiveSessionId(initialSession.activeSessionId);
+        setState(initialSession.state);
+        shouldFollowTranscriptRef.current = true;
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice(formatError(error));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInitialized(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!shouldFollowTranscriptRef.current) {
@@ -146,6 +234,10 @@ export function App() {
     if (runningRef.current) {
       return;
     }
+    if (!sessionId) {
+      setNotice("Create a session first.");
+      return;
+    }
     if (!nextInput) {
       setNotice("Enter a task first.");
       return;
@@ -156,9 +248,7 @@ export function App() {
     shouldFollowTranscriptRef.current = true;
     setNotice("");
     setApproval(undefined);
-    setSessionStore((latest) =>
-      updateSessionAfterPrompt(latest, sessionId, nextInput),
-    );
+    setSessions((latest) => updateSessionAfterPrompt(latest, sessionId, nextInput));
 
     try {
       const response = await fetch("/api/run", {
@@ -190,8 +280,10 @@ export function App() {
         setApproval(undefined);
         setNotice(sseEvent.data.message);
       });
+      await refreshSessions(sessionId);
     } catch (error) {
       setNotice(formatError(error));
+      await refreshSessions(sessionId).catch(() => undefined);
     } finally {
       runningRef.current = false;
       setBusy(false);
@@ -228,23 +320,23 @@ export function App() {
     }
   }
 
-  function createSession() {
+  async function createSession() {
     if (sessionActionsDisabled) {
       return;
     }
 
-    setSessionStore((latest) => {
-      const nextSession = createSessionSummary(latest.sessions.length + 1);
-      return {
-        activeSessionId: nextSession.id,
-        sessions: [nextSession, ...latest.sessions],
-      };
-    });
-    setState(createInitialWebUiState());
-    shouldFollowTranscriptRef.current = true;
-    setInput("");
     setNotice("");
     setApproval(undefined);
+    try {
+      const nextSession = await sessionCreateRequest();
+      setSessions((latest) => mergeSession(latest, nextSession));
+      setActiveSessionId(nextSession.id);
+      setState(createInitialWebUiState());
+      shouldFollowTranscriptRef.current = true;
+      setInput("");
+    } catch (error) {
+      setNotice(formatError(error));
+    }
   }
 
   async function switchSession(nextSessionId: string) {
@@ -259,12 +351,69 @@ export function App() {
       setState(nextState);
       shouldFollowTranscriptRef.current = true;
       setInput("");
-      setSessionStore((latest) => ({
-        activeSessionId: nextSessionId,
-        sessions: touchSession(latest.sessions, nextSessionId),
-      }));
+      setActiveSessionId(nextSessionId);
     } catch (error) {
       setNotice(formatError(error));
+    }
+  }
+
+  function openDeleteSessionDialog(targetSession: CodingWebSessionSummary) {
+    if (sessionActionsDisabled) {
+      return;
+    }
+    setDeleteTargetSession(targetSession);
+  }
+
+  async function confirmDeleteSession() {
+    const targetSession = deleteTargetSession;
+    if (!targetSession || sessionActionsDisabled) {
+      return;
+    }
+
+    setNotice("");
+    setApproval(undefined);
+    try {
+      await sessionDeleteRequest(targetSession.id);
+      const nextSessions = await sessionListRequest();
+      if (nextSessions.length === 0) {
+        const nextSession = await sessionCreateRequest();
+        setSessions([nextSession]);
+        setActiveSessionId(nextSession.id);
+        setState(createInitialWebUiState());
+        setInput("");
+        shouldFollowTranscriptRef.current = true;
+        setDeleteTargetSession(undefined);
+        return;
+      }
+
+      setSessions(nextSessions);
+      if (
+        targetSession.id === sessionId ||
+        !nextSessions.some((session) => session.id === sessionId)
+      ) {
+        const nextSessionId = nextSessions[0].id;
+        const nextState = await sessionStateRequest(nextSessionId);
+        setActiveSessionId(nextSessionId);
+        setState(nextState);
+        setInput("");
+        shouldFollowTranscriptRef.current = true;
+      }
+      setDeleteTargetSession(undefined);
+    } catch (error) {
+      setNotice(formatError(error));
+      setDeleteTargetSession(undefined);
+    }
+  }
+
+  async function refreshSessions(preferredSessionId: string) {
+    const nextSessions = await sessionListRequest();
+    setSessions(nextSessions);
+    if (nextSessions.some((session) => session.id === preferredSessionId)) {
+      setActiveSessionId(preferredSessionId);
+      return;
+    }
+    if (nextSessions[0]) {
+      setActiveSessionId(nextSessions[0].id);
     }
   }
 
@@ -286,8 +435,9 @@ export function App() {
           disabled={sessionActionsDisabled}
           loading={sessionLoading}
           onCreate={createSession}
+          onDelete={openDeleteSessionDialog}
           onSelect={switchSession}
-          sessions={sessionStore.sessions}
+          sessions={sessions}
         />
         <StatusPanel state={state} />
         <TodoPanel todos={state.todos} />
@@ -328,7 +478,7 @@ export function App() {
           )}
           <textarea
             className="min-h-24 resize-y rounded-md border border-input bg-background px-3 py-3 text-sm outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={requestBusy}
+            disabled={runDisabled}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Ask Kairos to inspect, edit, or explain this workspace..."
             value={input}
@@ -338,13 +488,19 @@ export function App() {
               <span className="break-words">{activeSession?.title ?? "Session"}</span>{" "}
               <span className="font-mono">{sessionId}</span>
             </p>
-            <Button disabled={requestBusy} type="submit">
+            <Button disabled={runDisabled} type="submit">
               {busy ? <LoaderCircleIcon className="animate-spin" /> : <PlayIcon />}
               {busy ? "Running" : "Run"}
             </Button>
           </div>
         </form>
       </section>
+      <DeleteSessionDialog
+        busy={sessionDeleteLoading}
+        onCancel={() => setDeleteTargetSession(undefined)}
+        onConfirm={confirmDeleteSession}
+        session={deleteTargetSession}
+      />
     </main>
   );
 }
@@ -359,6 +515,64 @@ async function requestSessionState(sessionId: string): Promise<WebUiState> {
   }
 
   return (body as { state: WebUiState }).state;
+}
+
+async function loadInitialSession({
+  activeSessionId,
+  createSession,
+  listSessions,
+  loadState,
+}: {
+  activeSessionId: string;
+  createSession: () => Promise<CodingWebSessionSummary>;
+  listSessions: () => Promise<CodingWebSessionSummary[]>;
+  loadState: (sessionId: string) => Promise<WebUiState>;
+}): Promise<InitialSessionLoad> {
+  const loadedSessions = await listSessions();
+  const preferredSessionId = chooseActiveSessionId(
+    loadedSessions,
+    activeSessionId,
+  );
+  const initialSessionId = preferredSessionId ?? (await createSession()).id;
+  const sessions = preferredSessionId ? loadedSessions : await listSessions();
+  const state = await loadState(initialSessionId);
+
+  return {
+    activeSessionId: initialSessionId,
+    sessions,
+    state,
+  };
+}
+
+async function requestSessions(): Promise<CodingWebSessionSummary[]> {
+  const response = await fetch("/api/sessions");
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(readError(body, "Session list failed."));
+  }
+
+  return (body as CodingWebSessionListResponse).sessions ?? [];
+}
+
+async function requestCreateSession(): Promise<CodingWebSessionSummary> {
+  const response = await fetch("/api/sessions", { method: "POST" });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(readError(body, "Session create failed."));
+  }
+
+  return (body as CodingWebCreateSessionResponse).session;
+}
+
+async function requestDeleteSession(sessionId: string): Promise<void> {
+  const response = await fetch(
+    `/api/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(readError(body, "Session delete failed."));
+  }
 }
 
 async function requestApprovalDecision({
@@ -386,6 +600,7 @@ function SessionPanel({
   disabled,
   loading,
   onCreate,
+  onDelete,
   onSelect,
   sessions,
 }: {
@@ -393,6 +608,7 @@ function SessionPanel({
   disabled: boolean;
   loading: boolean;
   onCreate: () => void;
+  onDelete: (session: CodingWebSessionSummary) => void;
   onSelect: (sessionId: string) => void;
   sessions: readonly CodingWebSessionSummary[];
 }) {
@@ -409,13 +625,16 @@ function SessionPanel({
         {sessions.map((session) => {
           const active = session.id === activeSessionId;
           return (
-            <li className="list-none" key={session.id}>
+            <li
+              className={`grid grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden rounded-md transition ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              }`}
+              key={session.id}
+            >
               <button
-                className={`grid w-full gap-1 rounded-md px-3 py-2 text-left transition ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted disabled:hover:bg-transparent"
-                }`}
+                className="grid min-w-0 gap-1 px-3 py-2 text-left disabled:cursor-default"
                 disabled={disabled || active}
                 onClick={() => onSelect(session.id)}
                 type="button"
@@ -429,11 +648,80 @@ function SessionPanel({
                   {loading && active ? "Loading" : formatSessionTime(session.updatedAt)}
                 </span>
               </button>
+              <Button
+                aria-label={`Delete session ${session.title}`}
+                className={
+                  active
+                    ? "mr-2 text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                    : "mr-2 text-muted-foreground"
+                }
+                disabled={disabled}
+                onClick={() => onDelete(session)}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2Icon />
+              </Button>
             </li>
           );
         })}
       </ol>
     </section>
+  );
+}
+
+function DeleteSessionDialog({
+  busy,
+  onCancel,
+  onConfirm,
+  session,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  session?: CodingWebSessionSummary;
+}) {
+  return (
+    <AlertDialog
+      onOpenChange={(open) => {
+        if (!open && !busy) {
+          onCancel();
+        }
+      }}
+      open={Boolean(session)}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the saved session from this workspace. This action cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {session && (
+          <div className="rounded-md border bg-muted px-3 py-2">
+            <p className="truncate font-medium text-sm">{session.title}</p>
+            <p className="truncate font-mono text-muted-foreground text-xs">
+              {session.id}
+            </p>
+          </div>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className={buttonVariants({ variant: "destructive" })}
+            disabled={busy}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            {busy ? "Deleting" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -727,31 +1015,21 @@ function parseSseEvent(raw: string): SseEvent | undefined {
   } as SseEvent;
 }
 
-function loadSessionStore(): CodingWebSessionStore {
-  const stored = readSessionStore();
-  if (stored) {
-    return stored;
+function loadActiveSessionId(): string {
+  const activeSessionId = localStorage.getItem(ACTIVE_SESSION_KEY);
+  if (isSessionId(activeSessionId)) {
+    return activeSessionId;
   }
 
   const legacySessionId = localStorage.getItem(LEGACY_SESSION_KEY);
-  const sessionId = isSessionId(legacySessionId)
-    ? legacySessionId
-    : createSessionId();
-  const now = Date.now();
-  return {
-    activeSessionId: sessionId,
-    sessions: [
-      {
-        id: sessionId,
-        title: "Session 1",
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
-  };
+  if (isSessionId(legacySessionId)) {
+    return legacySessionId;
+  }
+
+  return readLegacyActiveSessionId() ?? "";
 }
 
-function readSessionStore(): CodingWebSessionStore | undefined {
+function readLegacyActiveSessionId(): string | undefined {
   try {
     const raw = localStorage.getItem(SESSION_STORE_KEY);
     if (!raw) {
@@ -759,97 +1037,58 @@ function readSessionStore(): CodingWebSessionStore | undefined {
     }
 
     const value = JSON.parse(raw) as unknown;
-    if (!isRecord(value) || !Array.isArray(value.sessions)) {
-      return undefined;
-    }
-
-    const sessionValues = value.sessions;
-    const sessions = sessionValues
-      .map(readSessionSummary)
-      .filter((session): session is CodingWebSessionSummary => Boolean(session));
-    const activeSessionId = isSessionId(value.activeSessionId)
+    return isRecord(value) && isSessionId(value.activeSessionId)
       ? value.activeSessionId
-      : sessions[0]?.id;
-
-    if (!activeSessionId || sessions.length === 0) {
-      return undefined;
-    }
-
-    if (!sessions.some((session) => session.id === activeSessionId)) {
-      sessions.unshift(createSessionSummary(1, activeSessionId));
-    }
-
-    return {
-      activeSessionId,
-      sessions,
-    };
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
-function readSessionSummary(value: unknown): CodingWebSessionSummary | undefined {
-  if (!isRecord(value) || !isSessionId(value.id)) {
-    return undefined;
+function saveActiveSessionId(sessionId: string) {
+  localStorage.setItem(ACTIVE_SESSION_KEY, sessionId);
+  localStorage.setItem(LEGACY_SESSION_KEY, sessionId);
+}
+
+function chooseActiveSessionId(
+  sessions: readonly CodingWebSessionSummary[],
+  preferredSessionId: string,
+): string | undefined {
+  if (
+    preferredSessionId &&
+    sessions.some((session) => session.id === preferredSessionId)
+  ) {
+    return preferredSessionId;
   }
 
-  const now = Date.now();
-  return {
-    id: value.id,
-    title: typeof value.title === "string" && value.title.trim()
-      ? value.title.trim()
-      : "Session",
-    createdAt: typeof value.createdAt === "number" ? value.createdAt : now,
-    updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : now,
-  };
+  return sessions[0]?.id;
 }
 
-function saveSessionStore(store: CodingWebSessionStore) {
-  localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(store));
-  localStorage.setItem(LEGACY_SESSION_KEY, store.activeSessionId);
-}
-
-function createSessionSummary(
-  index: number,
-  id = createSessionId(),
-): CodingWebSessionSummary {
-  const now = Date.now();
-  return {
-    id,
-    title: `Session ${index}`,
-    createdAt: now,
-    updatedAt: now,
-  };
+function mergeSession(
+  sessions: readonly CodingWebSessionSummary[],
+  nextSession: CodingWebSessionSummary,
+): CodingWebSessionSummary[] {
+  return [
+    nextSession,
+    ...sessions.filter((session) => session.id !== nextSession.id),
+  ];
 }
 
 function updateSessionAfterPrompt(
-  store: CodingWebSessionStore,
-  sessionId: string,
-  input: string,
-): CodingWebSessionStore {
-  return {
-    activeSessionId: sessionId,
-    sessions: store.sessions.map((session) =>
-      session.id === sessionId
-        ? {
-            ...session,
-            title: shouldReplaceSessionTitle(session.title)
-              ? createSessionTitle(input)
-              : session.title,
-            updatedAt: Date.now(),
-          }
-        : session,
-    ),
-  };
-}
-
-function touchSession(
   sessions: readonly CodingWebSessionSummary[],
   sessionId: string,
+  input: string,
 ): CodingWebSessionSummary[] {
-  const now = Date.now();
   return sessions.map((session) =>
-    session.id === sessionId ? { ...session, updatedAt: now } : session,
+    session.id === sessionId
+      ? {
+          ...session,
+          title: shouldReplaceSessionTitle(session.title)
+            ? createSessionTitle(input)
+            : session.title,
+          updatedAt: new Date().toISOString(),
+        }
+      : session,
   );
 }
 
@@ -862,12 +1101,6 @@ function createSessionTitle(input: string): string {
   return normalized.length > 42 ? `${normalized.slice(0, 39)}...` : normalized;
 }
 
-function createSessionId(): string {
-  return typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `session_${Date.now().toString(36)}`;
-}
-
 function isSessionId(value: unknown): value is string {
   return typeof value === "string" && SESSION_ID_PATTERN.test(value);
 }
@@ -876,13 +1109,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function formatSessionTime(value: number): string {
+function formatSessionTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
     month: "short",
     day: "numeric",
-  }).format(value);
+  }).format(new Date(value));
 }
 
 function readError(value: unknown, fallback: string) {
