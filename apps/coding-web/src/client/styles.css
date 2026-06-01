@@ -1,4 +1,11 @@
 @import "tailwindcss";
+@import "streamdown/styles.css";
+
+@source "../../node_modules/streamdown/dist/*.js";
+@source "../../node_modules/@streamdown/cjk/dist/*.js";
+@source "../../node_modules/@streamdown/code/dist/*.js";
+@source "../../node_modules/@streamdown/math/dist/*.js";
+@source "../../node_modules/@streamdown/mermaid/dist/*.js";
 
 @theme inline {
   --color-background: var(--background);
@@ -76,7 +83,9 @@ textarea {
 }
 
 .kairos-response {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow-wrap: break-word;
+  line-height: 1.6;
 }
 
 .kairos-response :where(p, ul, ol, pre, blockquote) {
